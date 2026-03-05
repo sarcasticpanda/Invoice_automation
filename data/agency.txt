@@ -1,0 +1,38 @@
+**InvoiceFlow: AI-Powered Email & Invoice Automation**
+
+---
+
+**Welcome to InvoiceFlow**
+
+InvoiceFlow is a specialized platform designed to automate customer support and invoice processing. Our AI agents handle everything from email categorization to complex product inquiries, ensuring your business stays efficient and responsive.
+
+---
+
+**The Complete AI Automation Suite**
+
+InvoiceFlow offers a comprehensive suite of features to streamline your business communications:
+
+- **AI-Powered Email Categorization**: Automatically sort incoming emails into product inquiries, complaints, and feedback.
+- **RAG-Driven Responses**: Use Retrieval-Augmented Generation to provide accurate answers based on your business documents.
+- **Automated Draft Creation**: Quickly generate professional, empathetic email drafts ready for review.
+- **Quality Assurance**: Every AI-generated response is proofread by a secondary agent to ensure high standards.
+- **Custom Knowledge Base**: Train your agents with your own data for specialized business knowledge.
+
+---
+
+**Frequently Asked Questions**
+
+- *How does the automation work?*
+  The system monitors your inbox, categorizes content, and uses RAG to pull relevant information before drafting a response.
+
+- *Can I customize the agent's tone?*
+  Yes, the system is designed to match different tones based on the email category (empathetic for complaints, professional for inquiries).
+
+- *Does it support API integrations?*
+  Yes, the system can be deployed as an API using FastAPI and LangServe.
+
+---
+
+**Get Started with InvoiceFlow Today**
+
+Unlock the power of AI automation and transform your customer support workflow.
