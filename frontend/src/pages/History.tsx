@@ -2,31 +2,21 @@ import { useEffect, useState, useMemo } from 'react'
 import { motion } from 'motion/react'
 import { Link } from 'react-router-dom'
 import { Clock, MessageSquare, ChevronRight, BarChart2, PieChart as PieChartIcon } from 'lucide-react'
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as BarTooltip } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip as RT, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as BT } from 'recharts'
+
+const tipStyle = { backgroundColor:'rgba(15,23,42,0.92)', border:'1px solid rgba(0,0,0,0.15)', borderRadius:'10px', fontSize:'12px', color:'rgba(255,255,255,0.9)' }
 
 interface Contact {
-  email: string
-  total_conversations: number
-  latest_timestamp: string
-  latest_subject: string
-  dominant_sentiment: string
-  categories: string[]
+  email: string; total_conversations: number; latest_timestamp: string
+  latest_subject: string; dominant_sentiment: string; categories: string[]
 }
-
-const sentimentColors: Record<string, string> = {
-  positive: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  neutral: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  negative: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
-  urgent: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  unknown: 'bg-white/10 text-white/50 border-white/10',
-}
-
-const sentimentHex: Record<string, string> = {
-  positive: '#10b981',
-  neutral: '#3b82f6',
-  negative: '#f43f5e',
-  urgent: '#f59e0b',
-  unknown: '#9ca3af',
+const sentimentHex: Record<string,string> = { positive:'#10b981', neutral:'#3b82f6', negative:'#f43f5e', urgent:'#f59e0b', unknown:'#9ca3af' }
+const sentimentBadge: Record<string,{bg:string;text:string;ring:string}> = {
+  positive: { bg:'rgba(5,150,105,0.12)', text:'#065f46', ring:'rgba(5,150,105,0.25)' },
+  neutral:  { bg:'rgba(29,78,216,0.10)', text:'#1e40af', ring:'rgba(29,78,216,0.22)' },
+  negative: { bg:'rgba(185,28,28,0.10)', text:'#991b1b', ring:'rgba(185,28,28,0.22)' },
+  urgent:   { bg:'rgba(180,83,9,0.12)',  text:'#92400e', ring:'rgba(180,83,9,0.25)' },
+  unknown:  { bg:'rgba(0,0,0,0.05)',     text:'#64748b', ring:'rgba(0,0,0,0.08)' },
 }
 
 export default function History() {
@@ -34,187 +24,131 @@ export default function History() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/history/contacts')
-      .then(r => r.json())
-      .then(data => {
-        setContacts(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    fetch('/api/history/contacts').then(r=>r.json()).then(d=>{ setContacts(d); setLoading(false) }).catch(()=>setLoading(false))
   }, [])
 
-  const sentimentData = useMemo(() => {
-    const counts = contacts.reduce((acc, c) => {
-      acc[c.dominant_sentiment] = (acc[c.dominant_sentiment] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-    return Object.entries(counts).map(([name, value]) => ({ name, value }))
+  const sentimentData = useMemo(()=>{
+    const c = contacts.reduce((a,c)=>{ a[c.dominant_sentiment]=(a[c.dominant_sentiment]||0)+1; return a },{} as Record<string,number>)
+    return Object.entries(c).map(([name,value])=>({name,value}))
   }, [contacts])
 
-  const categoryData = useMemo(() => {
-    const counts = contacts.reduce((acc, c) => {
-      c.categories.forEach(cat => {
-        if (!cat) return
-        acc[cat] = (acc[cat] || 0) + 1
-      })
-      return acc
-    }, {} as Record<string, number>)
-    return Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5)
+  const categoryData = useMemo(()=>{
+    const c = contacts.reduce((a,c)=>{ c.categories.forEach(cat=>{ if(cat) a[cat]=(a[cat]||0)+1 }); return a },{} as Record<string,number>)
+    return Object.entries(c).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value).slice(0,5)
   }, [contacts])
 
   return (
-    <div className="max-w-7xl mx-auto pb-20">
-      <div className="mb-10">
-        <motion.h1
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-4xl font-bold tracking-tight"
-        >
-          <span className="bg-gradient-to-r from-white to-white/70 bg-clip-text text-transparent">
-            Intelligence Hub
-          </span>
-        </motion.h1>
-        <p className="text-white/40 text-sm mt-2">Comprehensive analytics and contact relationship history</p>
+    <div className="max-w-6xl mx-auto pb-20">
+      <div className="mb-8">
+        <motion.h1 initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }}
+          className="text-[28px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>Intelligence Hub</motion.h1>
+        <p className="text-sm mt-1" style={{ color: 'var(--t2)' }}>Comprehensive analytics and contact relationship history</p>
       </div>
 
       {loading ? (
         <div className="flex justify-center p-20">
-          <div className="w-10 h-10 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+          <div className="w-8 h-8 rounded-full border-2 border-[#3D81E3] border-t-transparent animate-spin" />
         </div>
-      ) : contacts.length === 0 ? (
-        <div className="liquid-glass rounded-2xl p-16 text-center max-w-2xl mx-auto">
-          <Clock className="w-16 h-16 text-white/10 mx-auto mb-6" />
-          <h3 className="text-2xl font-medium text-white/80">Awaiting Data</h3>
-          <p className="text-white/40 text-base mt-2">Emails processed by your pipeline will generate analytics here.</p>
+      ) : contacts.length===0 ? (
+        <div className="glass-card rounded-2xl p-16 text-center max-w-2xl mx-auto">
+          <Clock className="w-14 h-14 text-gray-200 mx-auto mb-6" />
+          <h3 className="text-xl font-medium" style={{ color: 'var(--t2)' }}>Awaiting Data</h3>
+          <p className="text-sm mt-2" style={{ color: 'var(--t3)' }}>Emails processed by your pipeline will generate analytics here.</p>
         </div>
       ) : (
         <>
-          {/* Analytics Top Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-            {/* Sentiment Chart */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="liquid-glass rounded-2xl p-6"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <PieChartIcon className="w-5 h-5 text-brand" />
-                <h3 className="text-lg font-medium text-white/90">Sentiment Overview</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <motion.div initial={{ opacity:0, scale:0.97 }} animate={{ opacity:1, scale:1 }} className="glass-card rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <PieChartIcon className="w-4 h-4 text-[#3D81E3]" />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--t2)' }}>Sentiment Overview</h3>
               </div>
-              <div className="h-64">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie
-                      data={sentimentData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {sentimentData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={sentimentHex[entry.name] || sentimentHex.unknown} />
-                      ))}
+                    <Pie data={sentimentData} cx="50%" cy="50%" innerRadius={54} outerRadius={74} paddingAngle={4} dataKey="value">
+                      {sentimentData.map((e,i)=><Cell key={i} fill={sentimentHex[e.name]||sentimentHex.unknown} />)}
                     </Pie>
-                    <RechartsTooltip 
-                      contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                      itemStyle={{ color: '#fff' }}
-                    />
+                    <RT contentStyle={tipStyle} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             </motion.div>
 
-            {/* Top Categories */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-              className="liquid-glass rounded-2xl p-6"
-            >
-              <div className="flex items-center gap-3 mb-6">
-                <BarChart2 className="w-5 h-5 text-purple-400" />
-                <h3 className="text-lg font-medium text-white/90">Top Topics</h3>
+            <motion.div initial={{ opacity:0, scale:0.97 }} animate={{ opacity:1, scale:1 }} transition={{ delay:0.08 }} className="glass-card rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <BarChart2 className="w-4 h-4 text-purple-500" />
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--t2)' }}>Top Topics</h3>
               </div>
-              <div className="h-64">
+              <div className="h-56">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={categoryData} layout="vertical" margin={{ left: 20 }}>
+                  <BarChart data={categoryData} layout="vertical" margin={{ left:20 }}>
                     <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} />
-                    <BarTooltip 
-                      cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                      contentStyle={{ backgroundColor: 'rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                    />
-                    <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} barSize={20} />
+                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill:'#64748b', fontSize:12 }} />
+                    <BT contentStyle={tipStyle} cursor={{ fill:'rgba(0,0,0,0.03)' }} />
+                    <Bar dataKey="value" fill="#6366f1" radius={[0,4,4,0]} barSize={18} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </motion.div>
           </div>
 
-          {/* Contact List */}
-          <h3 className="text-xl font-bold text-white/90 mb-6 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-brand" />
-            Contact Histories
+          <h3 className="text-base font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--t2)' }}>
+            <MessageSquare className="w-4 h-4 text-[#3D81E3]" /> Contact Histories
           </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {contacts.map((contact, i) => (
-              <motion.div
-                key={contact.email}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <Link to={`/history/${encodeURIComponent(contact.email)}`} className="block h-full">
-                  <div className="liquid-glass h-full rounded-2xl p-6 hover:bg-white/[0.04] transition-all duration-300 group relative overflow-hidden border border-white/5 hover:border-brand/30">
-                    <div className="absolute inset-0 bg-gradient-to-r from-brand/0 to-brand/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    
-                    <div className="flex items-start justify-between relative z-10">
-                      <div className="flex gap-4">
-                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-xl font-bold text-white/80 shrink-0 shadow-inner">
-                          {contact.email.charAt(0).toUpperCase()}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {contacts.map((contact, i) => {
+              const badge = sentimentBadge[contact.dominant_sentiment]||sentimentBadge.unknown
+              return (
+                <motion.div key={contact.email} initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.04 }}>
+                  <Link to={`/history/${encodeURIComponent(contact.email)}`} className="block h-full">
+                    <div className="glass-card h-full rounded-2xl p-5 transition-all duration-200 group"
+                      onMouseEnter={e=>{ const el=e.currentTarget as HTMLDivElement; el.style.boxShadow='0 4px 24px rgba(0,0,0,0.09)'; el.style.borderColor='rgba(61,129,227,0.25)' }}
+                      onMouseLeave={e=>{ const el=e.currentTarget as HTMLDivElement; el.style.boxShadow='0 2px 16px rgba(0,0,0,0.05)'; el.style.borderColor='rgba(255,255,255,0.85)' }}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex gap-3">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold shrink-0"
+                            style={{ background:'rgba(0,0,0,0.07)', color: 'var(--t2)' }}>
+                            {contact.email.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-[15px] truncate max-w-[180px] sm:max-w-xs" style={{ color: 'var(--t1)' }}>{contact.email}</h3>
+                            <p className="text-[12px] mt-0.5" style={{ color: 'var(--t3)' }}>{contact.total_conversations} interaction(s)</p>
+                          </div>
                         </div>
-                        <div>
-                          <h3 className="font-semibold text-lg text-white/95 truncate max-w-[200px] sm:max-w-xs">{contact.email}</h3>
-                          <p className="text-white/40 text-sm mt-1">{contact.total_conversations} recorded interaction(s)</p>
-                        </div>
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold border shadow-sm ${sentimentColors[contact.dominant_sentiment] || sentimentColors.unknown}`}>
-                        {contact.dominant_sentiment.toUpperCase()}
-                      </span>
-                    </div>
-
-                    <div className="mt-6 pt-5 border-t border-white/10 relative z-10">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Latest Thread</span>
-                        <span className="text-xs text-white/30 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {new Date(contact.latest_timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-medium shrink-0"
+                          style={{ background:badge.bg, color:badge.text, boxShadow:`0 0 0 1px ${badge.ring}` }}>
+                          {contact.dominant_sentiment}
                         </span>
                       </div>
-                      <p className="text-white/70 text-sm font-medium truncate mb-4">{contact.latest_subject}</p>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap gap-2">
-                          {contact.categories.slice(0, 3).map(cat => (
-                            cat && <span key={cat} className="px-2 py-1 rounded bg-black/40 text-[10px] font-medium text-white/50">
-                              {cat.replace('_', ' ')}
-                            </span>
-                          ))}
+
+                      <div className="mt-4 pt-4" style={{ borderTop:'1px solid var(--divider)' }}>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--t3)' }}>Latest Thread</span>
+                          <span className="text-[11px] flex items-center gap-1" style={{ color: 'var(--t3)' }}>
+                            <Clock className="w-3 h-3" />
+                            {new Date(contact.latest_timestamp).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                          </span>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-brand transition-colors">
-                          <ChevronRight className="w-4 h-4 text-white/40 group-hover:text-white" />
+                        <p className="text-[13px] font-medium truncate mb-3" style={{ color: 'var(--t2)' }}>{contact.latest_subject}</p>
+                        <div className="flex items-center justify-between">
+                          <div className="flex flex-wrap gap-1.5">
+                            {contact.categories.slice(0,3).map(cat=>cat&&(
+                              <span key={cat} className="px-2 py-0.5 rounded text-[10px]"
+                                style={{ background:'rgba(0,0,0,0.05)', color: 'var(--t2)' }}>{cat.replace('_',' ')}</span>
+                            ))}
+                          </div>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                            style={{ background:'rgba(0,0,0,0.05)' }}>
+                            <ChevronRight className="w-3.5 h-3.5 text-gray-400 group-hover:text-[#3D81E3]" />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                  </Link>
+                </motion.div>
+              )
+            })}
           </div>
         </>
       )}

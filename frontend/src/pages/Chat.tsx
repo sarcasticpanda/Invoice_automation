@@ -3,176 +3,127 @@ import { motion } from 'motion/react'
 import { MessageSquarePlus, Loader2, Sparkles, Send, Trash2, FileText } from 'lucide-react'
 
 type Message = { role: string; content: string; sources?: { title: string; snippet: string }[] }
-type Session = { id: string; title: string; last_message?: string | null }
+type Session  = { id: string; title: string; last_message?: string | null }
 
 export default function Chat() {
   const [sessions, setSessions] = useState<Session[]>([])
-  const [activeId, setActiveId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string|null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
 
-  const loadSessions = async () => {
-    const res = await fetch('/api/chat/sessions')
-    const data = await res.json()
-    setSessions(data.sessions || [])
-  }
-
-  const openSession = async (id: string) => {
-    setActiveId(id)
-    const res = await fetch(`/api/chat/session/${id}/messages`)
-    const data = await res.json()
-    setMessages(data.messages || [])
-  }
-
-  const newChat = () => {
-    setActiveId(null)
-    setMessages([])
-  }
-
-  const deleteSession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    await fetch(`/api/chat/session/${id}`, { method: 'DELETE' })
-    if (activeId === id) newChat()
-    loadSessions()
-  }
+  const loadSessions = async () => { const r=await fetch('/api/chat/sessions'); const d=await r.json(); setSessions(d.sessions||[]) }
+  const openSession = async (id: string) => { setActiveId(id); const r=await fetch(`/api/chat/session/${id}/messages`); const d=await r.json(); setMessages(d.messages||[]) }
+  const newChat = () => { setActiveId(null); setMessages([]) }
+  const deleteSession = async (id:string, e:React.MouseEvent) => { e.stopPropagation(); await fetch(`/api/chat/session/${id}`,{method:'DELETE'}); if(activeId===id) newChat(); loadSessions() }
 
   const send = async (e: React.FormEvent) => {
     e.preventDefault()
-    const question = input.trim()
-    if (!question || loading) return
-
-    setInput('')
-    setMessages((m) => [...m, { role: 'user', content: question }])
-    setLoading(true)
+    const question=input.trim(); if(!question||loading) return
+    setInput(''); setMessages(m=>[...m,{role:'user',content:question}]); setLoading(true)
     try {
-      const res = await fetch('/api/chat/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, session_id: activeId }),
-      })
-      if (!res.ok) throw new Error('Request failed')
-      const data = await res.json()
-      setActiveId(data.session_id)
-      setMessages((m) => [...m, { role: 'assistant', content: data.answer, sources: data.sources }])
-      loadSessions()
-    } catch {
-      setMessages((m) => [...m, { role: 'assistant', content: '⚠️ Something went wrong. Please try again.' }])
-    } finally {
-      setLoading(false)
-    }
+      const res=await fetch('/api/chat/query',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question,session_id:activeId})})
+      if(!res.ok) throw new Error('Request failed')
+      const data=await res.json()
+      setActiveId(data.session_id); setMessages(m=>[...m,{role:'assistant',content:data.answer,sources:data.sources}]); loadSessions()
+    } catch { setMessages(m=>[...m,{role:'assistant',content:'⚠️ Something went wrong. Please try again.'}]) }
+    setLoading(false)
   }
 
-  useEffect(() => { loadSessions() }, [])
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, loading])
+  useEffect(()=>{ loadSessions() },[])
+  useEffect(()=>{ endRef.current?.scrollIntoView({behavior:'smooth'}) },[messages,loading])
 
   return (
     <div className="max-w-6xl mx-auto h-[calc(100vh-6rem)] flex gap-4">
       {/* Sessions sidebar */}
-      <div className="w-64 shrink-0 liquid-glass rounded-2xl flex flex-col overflow-hidden">
-        <button
-          onClick={newChat}
-          className="m-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand to-purple-500 text-white text-sm font-medium hover:shadow-lg hover:shadow-brand/20 transition-all"
-        >
+      <div className="glass-card w-64 shrink-0 rounded-2xl flex flex-col overflow-hidden">
+        <button onClick={newChat}
+          className="m-3 flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-[13px] font-semibold"
+          style={{ background:'linear-gradient(135deg,#3D81E3,#6366f1)', boxShadow:'0 4px 14px rgba(61,129,227,0.3)' }}>
           <MessageSquarePlus className="w-4 h-4" /> New chat
         </button>
         <div className="flex-1 overflow-y-auto px-2 pb-2 space-y-1">
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              onClick={() => openSession(s.id)}
-              className={`group flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-all ${
-                activeId === s.id ? 'bg-white/10 text-white' : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-              }`}
-            >
-              <span className="truncate flex-1">{s.title || 'New Conversation'}</span>
-              <button onClick={(e) => deleteSession(s.id, e)} className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-negative transition-all">
+          {sessions.map(s=>(
+            <div key={s.id} onClick={()=>openSession(s.id)}
+              className="group flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-[13px] cursor-pointer transition-all"
+              style={activeId===s.id?{background:'rgba(61,129,227,0.10)',color:'#1d4ed8'}:{color:'#64748b'}}
+              onMouseEnter={e=>{ if(activeId!==s.id)(e.currentTarget as HTMLDivElement).style.background='rgba(0,0,0,0.04)' }}
+              onMouseLeave={e=>{ if(activeId!==s.id)(e.currentTarget as HTMLDivElement).style.background='transparent' }}>
+              <span className="truncate flex-1">{s.title||'New Conversation'}</span>
+              <button onClick={e=>deleteSession(s.id,e)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-500 transition-all">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
-          {sessions.length === 0 && <p className="text-xs text-white/30 px-3 py-2">No conversations yet</p>}
+          {sessions.length===0&&<p className="text-xs text-gray-400 px-3 py-2">No conversations yet</p>}
         </div>
       </div>
 
       {/* Conversation panel */}
-      <div className="flex-1 liquid-glass rounded-2xl flex flex-col overflow-hidden relative">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-brand/5 rounded-full blur-[100px] pointer-events-none" />
-
-        <div className="px-6 py-4 border-b border-white/5">
-          <h1 className="text-lg font-semibold text-white/90">Policy Assistant</h1>
-          <p className="text-xs text-white/40">Ask about company policy — answers come from your uploaded documents</p>
+      <div className="glass-card flex-1 rounded-2xl flex flex-col overflow-hidden relative">
+        <div className="px-6 py-4" style={{ borderBottom:'1px solid var(--divider)' }}>
+          <h1 className="text-base font-semibold" style={{ color: 'var(--t1)' }}>Policy Assistant</h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--t3)' }}>Ask about company policy — answers come from your uploaded documents</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {messages.length === 0 && !loading && (
+          {messages.length===0&&!loading&&(
             <div className="h-full flex flex-col items-center justify-center text-center max-w-md mx-auto">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
-                <Sparkles className="w-8 h-8 text-white/20" />
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5"
+                style={{ background:'rgba(61,129,227,0.08)', border:'1px solid rgba(61,129,227,0.15)' }}>
+                <Sparkles className="w-7 h-7 text-[#3D81E3]" />
               </div>
-              <h3 className="text-xl font-semibold text-white/80 mb-2">How can I help?</h3>
-              <p className="text-sm text-white/40 leading-relaxed">
-                Ask anything about the company's privacy policy or business documents. I remember the conversation, so you can ask follow-ups.
-              </p>
+              <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--t2)' }}>How can I help?</h3>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--t3)' }}>Ask anything about the company's privacy policy or business documents. I remember the conversation, so you can ask follow-ups.</p>
             </div>
           )}
 
-          {messages.map((m, i) => (
-            m.role === 'user' ? (
-              <div key={i} className="flex justify-end">
-                <div className="bg-white/10 border border-white/10 rounded-2xl rounded-tr-sm px-5 py-3 max-w-[80%]">
-                  <p className="text-white/90 text-sm">{m.content}</p>
-                </div>
+          {messages.map((m,i)=>m.role==='user'?(
+            <div key={i} className="flex justify-end">
+              <div className="rounded-2xl rounded-tr-sm px-5 py-3 max-w-[80%]"
+                style={{ background:'rgba(61,129,227,0.12)', border:'1px solid rgba(61,129,227,0.18)' }}>
+                <p className="text-sm" style={{ color: 'var(--t1)' }}>{m.content}</p>
               </div>
-            ) : (
-              <div key={i} className="flex items-start gap-4">
-                <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-brand to-purple-600 flex items-center justify-center shadow-lg mt-1">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div className="liquid-glass border-none rounded-2xl rounded-tl-sm px-6 py-4 max-w-[90%]">
-                  {m.content.split('\n').map((p, idx) => (
-                    <p key={idx} className="text-white/80 text-sm leading-relaxed mb-2 last:mb-0">{p}</p>
-                  ))}
-                  {m.sources && m.sources.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-white/5">
-                      {m.sources.map((src, idx) => (
-                        <span key={idx} title={src.snippet} className="flex items-center gap-1 text-[10px] text-white/50 bg-white/5 border border-white/10 rounded-full px-2 py-1">
-                          <FileText className="w-3 h-3" /> {src.title}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            </div>
+          ):(
+            <div key={i} className="flex items-start gap-4">
+              <div className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center shadow-sm mt-1"
+                style={{ background:'linear-gradient(135deg,#3D81E3,#6366f1)' }}>
+                <Sparkles className="w-4 h-4 text-white" />
               </div>
-            )
+              <div className="rounded-2xl rounded-tl-sm px-6 py-4 max-w-[90%]"
+                style={{ background:'var(--input-bg)', border:'1px solid var(--input-border)' }}>
+                {m.content.split('\n').map((p,idx)=><p key={idx} className="text-sm leading-relaxed mb-2 last:mb-0" style={{ color: 'var(--t2)' }}>{p}</p>)}
+                {m.sources&&m.sources.length>0&&(
+                  <div className="flex flex-wrap gap-1.5 mt-3 pt-3" style={{ borderTop:'1px solid var(--divider)' }}>
+                    {m.sources.map((src,idx)=>(
+                      <span key={idx} title={src.snippet} className="flex items-center gap-1 text-[10px] rounded-full px-2 py-1"
+                        style={{ background:'rgba(0,0,0,0.05)', border:'1px solid rgba(0,0,0,0.07)', color: 'var(--t2)' }}>
+                        <FileText className="w-3 h-3" />{src.title}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           ))}
 
-          {loading && (
-            <div className="flex items-center gap-3 text-white/50 text-sm">
-              <Loader2 className="w-4 h-4 text-brand animate-spin" /> Thinking...
-            </div>
-          )}
+          {loading&&<div className="flex items-center gap-3 text-sm" style={{ color: 'var(--t3)' }}><Loader2 className="w-4 h-4 text-[#3D81E3] animate-spin"/>Thinking…</div>}
           <div ref={endRef} />
         </div>
 
-        <div className="p-4 border-t border-white/5 bg-black/40 backdrop-blur-xl">
-          <form onSubmit={send} className="relative flex items-end gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about company policy..."
-              disabled={loading}
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-brand/50 focus:border-brand/50 transition-all disabled:opacity-50"
-            />
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="submit"
-              disabled={loading || !input.trim()}
-              className="h-[48px] px-5 rounded-xl bg-gradient-to-r from-brand to-purple-500 text-white font-medium flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg hover:shadow-brand/20 transition-all"
-            >
+        <div className="p-4" style={{ borderTop:'1px solid var(--divider)' }}>
+          <form onSubmit={send} className="flex items-end gap-2">
+            <input type="text" value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask about company policy…" disabled={loading}
+              className="flex-1 rounded-xl px-4 py-3.5 text-[13px] placeholder-gray-400 outline-none transition-colors disabled:opacity-50"
+              style={{ background:'var(--input-bg)', border:'1px solid var(--input-border)', color: 'var(--t1)' }}
+              onFocus={e=>(e.target as HTMLInputElement).style.borderColor='rgba(61,129,227,0.4)'}
+              onBlur={e=>(e.target as HTMLInputElement).style.borderColor='var(--input-border)'} />
+            <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.98 }} type="submit"
+              disabled={loading||!input.trim()}
+              className="h-[46px] px-5 rounded-xl text-white font-medium flex items-center justify-center disabled:opacity-40"
+              style={{ background:'linear-gradient(135deg,#3D81E3,#6366f1)', boxShadow:'0 4px 14px rgba(61,129,227,0.3)' }}>
               <Send className="w-4 h-4" />
             </motion.button>
           </form>

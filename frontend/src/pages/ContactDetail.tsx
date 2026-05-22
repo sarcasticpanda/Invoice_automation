@@ -4,25 +4,19 @@ import { motion } from 'motion/react'
 import { ArrowLeft, User, Mail, Sparkles, Tag, Activity } from 'lucide-react'
 
 interface Conversation {
-  timestamp: string
-  sender_email: string
-  sender_subject: string
-  incoming_body: string
-  category: string
-  sentiment: string
-  sentiment_confidence: number
-  sentiment_summary: string
-  generated_reply: string
-  status: string
-  thread_id: string
+  timestamp: string; sender_email: string; sender_subject: string; incoming_body: string
+  category: string; sentiment: string; sentiment_confidence: number; sentiment_summary: string
+  generated_reply: string; status: string; thread_id: string
 }
 
-const sentimentColors: Record<string, string> = {
-  positive: 'text-positive',
-  neutral: 'text-blue-400',
-  negative: 'text-negative',
-  urgent: 'text-urgent',
-  unknown: 'text-white/50',
+const sentimentColors: Record<string,string> = {
+  positive:'text-emerald-600', neutral:'text-blue-600', negative:'text-rose-600',
+  urgent:'text-amber-600', unknown:'text-gray-400',
+}
+const statusBadge = (s: string) => {
+  if (s==='sent')  return { bg:'rgba(5,150,105,0.10)',  color:'#065f46' }
+  if (s==='draft') return { bg:'rgba(180,83,9,0.10)',   color:'#92400e' }
+  return               { bg:'rgba(0,0,0,0.06)',        color:'#64748b' }
 }
 
 export default function ContactDetail() {
@@ -30,109 +24,100 @@ export default function ContactDetail() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetch(`/api/history/contact/${encodeURIComponent(email || '')}`)
-      .then(r => r.json())
-      .then(data => {
-        setConversations(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [email])
+  useEffect(()=>{
+    fetch(`/api/history/contact/${encodeURIComponent(email||'')}`)
+      .then(r=>r.json()).then(d=>{ setConversations(d); setLoading(false) }).catch(()=>setLoading(false))
+  },[email])
 
   return (
     <div className="max-w-4xl mx-auto pb-20">
-      {/* Header */}
       <div className="mb-8">
-        <Link to="/history" className="inline-flex items-center gap-2 text-sm text-white/50 hover:text-white mb-6 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to History
+        <Link to="/history" className="inline-flex items-center gap-2 text-sm hover:text-gray-800 mb-6 transition-colors" style={{ color: 'var(--t2)' }}>
+          <ArrowLeft className="w-4 h-4"/> Back to History
         </Link>
         <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand to-purple-600 flex items-center justify-center shadow-lg shadow-brand/20">
-            <User className="w-8 h-8 text-white" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background:'linear-gradient(135deg,#3D81E3,#6366f1)', boxShadow:'0 4px 18px rgba(61,129,227,0.3)' }}>
+            <User className="w-7 h-7 text-white"/>
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white">{email}</h1>
-            <p className="text-white/40 text-sm mt-1">{conversations.length} total interactions</p>
+            <h1 className="text-[26px] font-semibold tracking-tight" style={{ color: 'var(--t1)' }}>{email}</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--t3)' }}>{conversations.length} total interactions</p>
           </div>
         </div>
       </div>
 
       {loading ? (
         <div className="flex justify-center p-10">
-          <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+          <div className="w-8 h-8 rounded-full border-2 border-[#3D81E3] border-t-transparent animate-spin"/>
         </div>
       ) : (
         <div className="space-y-8">
-          {conversations.map((conv, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="relative pl-8 before:absolute before:inset-y-0 before:left-[15px] before:w-px before:bg-white/10 last:before:bottom-auto last:before:h-full"
-            >
-              {/* Timeline Dot */}
-              <div className="absolute left-0 top-6 w-[30px] h-[30px] rounded-full bg-[#0c0c0c] border border-white/20 flex items-center justify-center">
-                <div className="w-2 h-2 rounded-full bg-brand" />
-              </div>
-
-              <div className="liquid-glass rounded-2xl overflow-hidden">
-                {/* Meta Header */}
-                <div className="px-6 py-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-semibold text-white/90">{new Date(conv.timestamp).toLocaleString()}</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                      conv.status === 'sent' ? 'bg-positive/20 text-positive' : 
-                      conv.status === 'draft' ? 'bg-amber-500/20 text-amber-500' : 
-                      'bg-white/10 text-white/50'
-                    }`}>
-                      {conv.status}
-                    </span>
-                  </div>
-                  <div className="flex gap-3">
-                    <span className="flex items-center gap-1.5 text-xs text-white/60 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
-                      <Tag className="w-3 h-3" /> {conv.category.replace('_', ' ')}
-                    </span>
-                    <span className="flex items-center gap-1.5 text-xs text-white/60 bg-black/40 px-3 py-1.5 rounded-lg border border-white/5">
-                      <Activity className={`w-3 h-3 ${sentimentColors[conv.sentiment] || sentimentColors.unknown}`} /> 
-                      <span className="capitalize">{conv.sentiment}</span> 
-                      <span className="opacity-50">({Math.round(conv.sentiment_confidence * 100)}%)</span>
-                    </span>
-                  </div>
+          {conversations.map((conv,i)=>{
+            const sb = statusBadge(conv.status)
+            return (
+              <motion.div key={i} initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.08 }}
+                className="relative pl-8 before:absolute before:inset-y-0 before:left-[15px] before:w-px last:before:bottom-auto"
+                style={{'--tw-before-border':'rgba(0,0,0,0.08)' as any}}>
+                <div className="absolute inset-y-0 left-[15px] w-px" style={{background:'rgba(0,0,0,0.08)'}} />
+                <div className="absolute left-0 top-6 w-[30px] h-[30px] rounded-full flex items-center justify-center"
+                  style={{ background:'rgba(255,255,255,0.9)', border:'1px solid rgba(0,0,0,0.12)' }}>
+                  <div className="w-2 h-2 rounded-full bg-[#3D81E3]"/>
                 </div>
 
-                <div className="p-6 space-y-6">
-                  {/* Incoming */}
-                  <div>
-                    <h4 className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <Mail className="w-3 h-3" /> Incoming: {conv.sender_subject}
-                    </h4>
-                    <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-sm text-white/80 whitespace-pre-wrap leading-relaxed">
-                      {conv.incoming_body}
+                <div className="glass-card rounded-2xl overflow-hidden">
+                  <div className="px-6 py-4 flex items-center justify-between" style={{borderBottom:'1px solid var(--divider)',background:'var(--card-header-bg)'}}>
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-semibold" style={{ color: 'var(--t2)' }}>{new Date(conv.timestamp).toLocaleString()}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                        style={{background:sb.bg,color:sb.color}}>{conv.status}</span>
                     </div>
-                    {conv.sentiment_summary && (
-                      <div className="mt-2 text-xs text-white/50 pl-4 border-l-2 border-white/10">
-                        <strong>AI Summary:</strong> {conv.sentiment_summary}
+                    <div className="flex gap-2">
+                      <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
+                        style={{background:'rgba(0,0,0,0.05)',border:'1px solid rgba(0,0,0,0.07)', color: 'var(--t2)'}}>
+                        <Tag className="w-3 h-3"/>{conv.category.replace('_',' ')}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg"
+                        style={{background:'rgba(0,0,0,0.05)',border:'1px solid rgba(0,0,0,0.07)', color: 'var(--t2)'}}>
+                        <Activity className={`w-3 h-3 ${sentimentColors[conv.sentiment]||sentimentColors.unknown}`}/>
+                        <span className="capitalize">{conv.sentiment}</span>
+                        <span style={{ color: 'var(--t3)' }}>({Math.round(conv.sentiment_confidence*100)}%)</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-5">
+                    <div>
+                      <h4 className="text-xs font-semibold uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: 'var(--t3)' }}>
+                        <Mail className="w-3 h-3"/> Incoming: {conv.sender_subject}
+                      </h4>
+                      <div className="p-4 rounded-xl text-sm whitespace-pre-wrap leading-relaxed"
+                        style={{background:'rgba(0,0,0,0.03)',border:'1px solid rgba(0,0,0,0.06)', color: 'var(--t1)'}}>
+                        {conv.incoming_body}
+                      </div>
+                      {conv.sentiment_summary&&(
+                        <div className="mt-2 text-xs pl-4" style={{borderLeft:'2px solid rgba(0,0,0,0.08)', color: 'var(--t3)'}}>
+                          <strong style={{ color: 'var(--t2)' }}>AI Summary:</strong> {conv.sentiment_summary}
+                        </div>
+                      )}
+                    </div>
+
+                    {conv.generated_reply&&(
+                      <div>
+                        <h4 className="text-xs font-semibold uppercase tracking-widest mb-2 flex items-center gap-2" style={{ color: 'var(--t3)' }}>
+                          <Sparkles className="w-3 h-3 text-[#3D81E3]"/> Generated Reply
+                        </h4>
+                        <div className="p-4 rounded-xl text-sm whitespace-pre-wrap leading-relaxed"
+                          style={{background:'rgba(61,129,227,0.05)',border:'1px solid rgba(61,129,227,0.15)', color: 'var(--t1)'}}>
+                          {conv.generated_reply}
+                        </div>
                       </div>
                     )}
                   </div>
-
-                  {/* AI Reply */}
-                  {conv.generated_reply && (
-                    <div>
-                      <h4 className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-2 flex items-center gap-2">
-                        <Sparkles className="w-3 h-3 text-brand" /> Generated Reply
-                      </h4>
-                      <div className="p-4 rounded-xl bg-brand/5 border border-brand/20 text-sm text-white/90 whitespace-pre-wrap leading-relaxed">
-                        {conv.generated_reply}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
-            </motion.div>
-          ))}
+              </motion.div>
+            )
+          })}
         </div>
       )}
     </div>
