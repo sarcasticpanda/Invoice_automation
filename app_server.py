@@ -6,15 +6,52 @@ import os
 import json
 import shutil
 from datetime import datetime
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from dotenv import load_dotenv
 from src import history_store
+from src.auth_service import (
+    make_token, decode_token, get_user, upsert_user,
+    user_is_setup, user_env, user_dir,
+)
+import jwt as _jwt
+import requests as _requests
 
 load_dotenv()
+
+# ── Auth mode ────────────────────────────────────────────────────────────────
+# SKIP_AUTH=true  →  local single-user dev mode (no login needed)
+# SKIP_AUTH=false →  multi-user web mode (Google OAuth login required)
+SKIP_AUTH = os.getenv("SKIP_AUTH", "true").lower() == "true"
+
+GOOGLE_CLIENT_ID     = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+FRONTEND_URL         = os.getenv("FRONTEND_URL", "http://localhost:3000")
+BACKEND_URL          = os.getenv("BACKEND_URL",  "http://localhost:5000")
+
+_bearer = HTTPBearer(auto_error=False)
+
+async def current_user(
+    creds: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> dict:
+    """
+    Dependency that extracts + validates the JWT.
+    In SKIP_AUTH mode returns a dummy user so existing local dev flow is unchanged.
+    """
+    if SKIP_AUTH:
+        return {"sub": "local", "email": os.getenv("MY_EMAIL", "local@dev"), "name": "Local Dev"}
+    if not creds:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        return decode_token(creds.credentials)
+    except _jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Session expired — please sign in again")
+    except _jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 app = FastAPI(title="InvoiceFlow API")
 
@@ -25,6 +62,126 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Google OAuth Login ───────────────────────────────────────────────────────
+
+GOOGLE_SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/gmail.modify",
+]
+
+def _google_redirect_uri():
+    return f"{BACKEND_URL}/api/auth/callback"
+
+@app.get("/api/auth/login")
+def auth_login():
+    """Step 1: redirect the browser to Google's consent screen."""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(500, "GOOGLE_CLIENT_ID not configured on the server")
+    from google_auth_oauthlib.flow import Flow
+    flow = Flow.from_client_config(
+        {"web": {
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [_google_redirect_uri()],
+        }},
+        scopes=GOOGLE_SCOPES,
+        redirect_uri=_google_redirect_uri(),
+    )
+    auth_url, _ = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
+    return RedirectResponse(url=auth_url)
+
+
+@app.get("/api/auth/callback")
+def auth_callback(code: str, request: Request):
+    """Step 2: exchange the code for tokens, save Gmail creds, return a JWT."""
+    from google_auth_oauthlib.flow import Flow
+    flow = Flow.from_client_config(
+        {"web": {
+            "client_id": GOOGLE_CLIENT_ID,
+            "client_secret": GOOGLE_CLIENT_SECRET,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "redirect_uris": [_google_redirect_uri()],
+        }},
+        scopes=GOOGLE_SCOPES,
+        redirect_uri=_google_redirect_uri(),
+    )
+    flow.fetch_token(code=code)
+    credentials = flow.credentials
+
+    # Get the user's Google profile
+    resp = _requests.get(
+        "https://www.googleapis.com/oauth2/v2/userinfo",
+        headers={"Authorization": f"Bearer {credentials.token}"},
+        timeout=10,
+    )
+    if not resp.ok:
+        raise HTTPException(500, "Could not fetch Google profile")
+    profile = resp.json()
+
+    user_id = profile["id"]
+    email   = profile["email"]
+    name    = profile.get("name", email)
+
+    # Persist the Gmail OAuth token for this user
+    d = user_dir(user_id)
+    (d / "token.json").write_text(credentials.to_json())
+
+    # Register/update in the user registry
+    existing = get_user(user_id)
+    upsert_user(user_id, {"email": email, "name": name})
+
+    # Create a signed JWT for the frontend
+    token = make_token(user_id, email, name)
+
+    # New user → /setup; existing user with API key → /
+    needs_setup = not (existing and existing.get("gemini_key"))
+    redirect_to = "/setup" if needs_setup else "/"
+    return RedirectResponse(
+        f"{FRONTEND_URL}/auth/callback?token={token}&next={redirect_to}"
+    )
+
+
+@app.get("/api/auth/me")
+def auth_me(user: dict = Depends(current_user)):
+    """Return the current user's profile."""
+    stored = get_user(user["sub"]) or {}
+    return {
+        "id":          user["sub"],
+        "email":       user["email"],
+        "name":        user.get("name", ""),
+        "is_setup":    user_is_setup(user["sub"]),
+        "has_gemini":  bool(stored.get("gemini_key")),
+    }
+
+
+@app.post("/api/auth/setup")
+async def auth_setup(request: Request, user: dict = Depends(current_user)):
+    """Save the user's Gemini (and optional Groq) API keys."""
+    body = await request.json()
+    gemini_key = (body.get("gemini_key") or "").strip()
+    groq_key   = (body.get("groq_key")   or "").strip()
+    if not gemini_key:
+        raise HTTPException(400, "Gemini API key is required")
+    upsert_user(user["sub"], {"gemini_key": gemini_key, "groq_key": groq_key})
+    return {"message": "Setup complete"}
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    return {"message": "Logged out"}
+
+
+# ─── Shared embeddings + vectorstore (singleton) ──────────────────────────────
 
 # Shared embeddings + vectorstore (singleton)
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -530,19 +687,18 @@ async def set_polling_status(request: Request):
     return {"enabled": POLLING_ENABLED, "interval": POLLING_INTERVAL}
 
 @app.post("/api/pipeline/run")
-async def run_pipeline(request: Request):
+async def run_pipeline(request: Request, user: dict = Depends(current_user)):
     """Run the email processing pipeline."""
     import subprocess
     import sys
-    
+
     body = await request.json() if request.headers.get("content-type") == "application/json" else {}
-    # mode: smart (default) | auto | review. Back-compat: auto_send=False -> review.
     mode = body.get("mode")
     if mode is None:
         mode = "auto" if body.get("auto_send", None) is True else (
             "review" if body.get("auto_send", None) is False else "smart")
 
-    # Fail fast if Gmail isn't authed — otherwise main.py hangs on browser login.
+    # Fail fast if Gmail isn't authed
     ready, message = gmail_status()
     if not ready:
         return {"status": "auth_required", "message": message}
@@ -551,12 +707,16 @@ async def run_pipeline(request: Request):
         args = [sys.executable, "main.py"]
         args.append({"auto": "--auto-send", "review": "--no-auto-send"}.get(mode, "--smart"))
 
+        # In multi-user mode, inject per-user env so the pipeline is isolated
+        run_env = user_env(user["sub"]) if not SKIP_AUTH else None
+
         result = subprocess.run(
             args,
             cwd=os.path.dirname(os.path.abspath(__file__)),
             capture_output=True,
             text=True,
             timeout=300,
+            env=run_env,
         )
         return {
             "status": "completed",

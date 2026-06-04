@@ -10,16 +10,26 @@ services:
                                #    API embeddings (see DEPLOY.md).
     buildCommand: "pip install -r requirements.txt && python populate_db_local.py"
     startCommand: "uvicorn app_server:app --host 0.0.0.0 --port $PORT"
+    disk:
+      name: user-data
+      mountPath: /opt/render/project/src
+      sizeGB: 1
     envVars:
       - key: PYTHON_VERSION
         value: "3.10.11"
+      - key: SKIP_AUTH
+        value: "false"              # ← set to "false" in production
+      - key: SECRET_KEY
+        generateValue: true         # Render auto-generates a secure random string
+      - key: GOOGLE_CLIENT_ID
+        sync: false                 # From Google Cloud Console (Web App OAuth client)
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        sync: false                 # e.g. https://your-app.vercel.app
+      - key: BACKEND_URL
+        sync: false                 # e.g. https://invoiceflow-api.onrender.com
       - key: GOOGLE_API_KEY
-        sync: false
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_SERVICE_KEY
-        sync: false
-      - key: MY_EMAIL
-        sync: false
+        sync: false                 # Gemini key (fallback if user has none yet)
       - key: GROQ_API_KEY
         sync: false

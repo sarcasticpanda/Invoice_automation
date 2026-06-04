@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 
-HISTORY_FILE = "email_history.json"
+HISTORY_FILE = os.getenv("IF_HISTORY_FILE", "email_history.json")
 
 REVIEW_STATUSES = {"draft", "needs_review"}
 SENT_STATUSES = {"sent", "auto_sent"}

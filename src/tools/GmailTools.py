@@ -55,23 +55,25 @@ class GmailToolsClass:
 
     def fetch_recent_emails(self, max_results=50):
         try:
-            # Set delay of 8 hours
+            # Simpler approach: search for emails in the inbox from today onwards
+            # Use RFC 2822 date format for after: and before: operators
             now = datetime.now()
             delay = now - timedelta(hours=8)
 
-            # Format for Gmail query
-            after_timestamp = int(delay.timestamp())
-            before_timestamp = int(now.timestamp())
+            # Gmail's after: and before: expect RFC 2822 format (YYYY/MM/DD without time)
+            # Convert to RFC 2822 format
+            after_rfc = delay.strftime("%Y/%m/%d")
+            before_rfc = (now + timedelta(days=1)).strftime("%Y/%m/%d")
 
-            # Query to get emails from the last 8 hours
-            query = f"after:{after_timestamp} before:{before_timestamp}"
+            # Query to get emails from the last 8 hours - use simpler format
+            query = f"in:inbox after:{after_rfc} before:{before_rfc}"
             results = self.service.users().messages().list(
                 userId="me", q=query, maxResults=max_results
             ).execute()
             messages = results.get("messages", [])
-            
+
             return messages
-        
+
         except Exception as error:
             print(f"An error occurred while fetching emails: {error}")
             return []
@@ -155,18 +157,21 @@ class GmailToolsClass:
 
         
     def _get_gmail_service(self):
+        # Allow per-user token/creds paths via env vars (set by auth_service.user_env)
+        token_file = os.getenv("IF_TOKEN_FILE", "token.json")
+        creds_file = os.getenv("IF_CREDS_FILE", "credentials.json")
         creds = None
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        if os.path.exists(token_file):
+            creds = Credentials.from_authorized_user_file(token_file, SCOPES)
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
             else:
-                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                flow = InstalledAppFlow.from_client_secrets_file(creds_file, SCOPES)
                 creds = flow.run_local_server(port=0)
-            with open('token.json', 'w') as token:
+            with open(token_file, 'w') as token:
                 token.write(creds.to_json())
-        
+
         return build('gmail', 'v1', credentials=creds)
     
     def _should_skip_email(self, email_info):
