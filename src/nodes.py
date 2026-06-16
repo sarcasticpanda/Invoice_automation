@@ -1,7 +1,23 @@
+from datetime import datetime
 from colorama import Fore, Style
 from .agents import Agents
 from .tools.GmailTools import GmailToolsClass
 from .state import GraphState, Email
+from . import history_store
+
+
+# Simple JSON-based history store
+HISTORY_FILE = "email_history.json"
+
+def _load_history():
+    return history_store.load_history()
+
+def _save_history(history):
+    history_store.save_history(history)
+
+def _log_conversation(email_data: dict):
+    """Log a conversation to history."""
+    history_store.append_history(email_data)
 
 
 class Nodes:
@@ -13,6 +29,11 @@ class Nodes:
         """Loads new emails from Gmail and updates the state."""
         print(Fore.YELLOW + "Loading new emails...\n" + Style.RESET_ALL)
         recent_emails = self.gmail_tools.fetch_unanswered_emails()
+        # Cap per run (configurable via MAX_EMAILS_PER_RUN). Groq's generous free
+        # tier means we can process the whole recent batch, so the default is high.
+        limit = int(os.getenv("MAX_EMAILS_PER_RUN", "25"))
+        recent_emails = recent_emails[:limit]
+        print(Fore.YELLOW + f"Processing {len(recent_emails)} email(s) this run.\n" + Style.RESET_ALL)
         emails = [Email(**email) for email in recent_emails]
         return {"emails": emails}
 
@@ -36,10 +57,28 @@ class Nodes:
         current_email = state["emails"][-1]
         result = self.agents.categorize_email.invoke({"email": current_email.body})
         print(Fore.MAGENTA + f"Email category: {result.category.value}" + Style.RESET_ALL)
+        thread_context = history_store.build_thread_context(current_email.threadId)
         
         return {
             "email_category": result.category.value,
-            "current_email": current_email
+            "current_email": current_email,
+            "thread_context": thread_context,
+        }
+
+    def analyze_sentiment(self, state: GraphState) -> GraphState:
+        """Analyzes sentiment of the current email."""
+        print(Fore.YELLOW + "Analyzing email sentiment...\n" + Style.RESET_ALL)
+        
+        current_email = state["current_email"]
+        result = self.agents.analyze_sentiment.invoke({"email": current_email.body})
+        
+        print(Fore.CYAN + f"Sentiment: {result.sentiment.value} (confidence: {result.confidence:.0%})" + Style.RESET_ALL)
+        print(Fore.CYAN + f"Summary: {result.summary}" + Style.RESET_ALL)
+        
+        return {
+            "email_sentiment": result.sentiment.value,
+            "email_sentiment_confidence": result.confidence,
+            "email_sentiment_summary": result.summary
         }
 
     def route_email_based_on_category(self, state: GraphState) -> str:
@@ -78,8 +117,11 @@ class Nodes:
         # Format input to the writer agent
         inputs = (
             f'# **EMAIL CATEGORY:** {state["email_category"]}\n\n'
+            f'# **SENTIMENT:** {state.get("email_sentiment", "unknown")} '
+            f'(confidence: {state.get("email_sentiment_confidence", 0):.0%})\n\n'
             f'# **EMAIL CONTENT:**\n{state["current_email"].body}\n\n'
-            f'# **INFORMATION:**\n{state["retrieved_documents"]}' # Empty for feedback or complaint
+            f'# **PREVIOUS THREAD CONTEXT:**\n{state.get("thread_context", "")}\n\n'
+            f'# **INFORMATION:**\n{state.get("retrieved_documents", "")}' 
         )
         
         # Get messages history for current email
@@ -118,6 +160,57 @@ class Nodes:
             "writer_messages": writer_messages
         }
 
+    def _human_review_reason(self, state: GraphState) -> str:
+        """Risky emails get a human; clearly-safe ones can auto-send.
+        Risky = complaints, negative/urgent sentiment, or low confidence."""
+        reasons = []
+        category = state.get("email_category", "")
+        sentiment = state.get("email_sentiment", "")
+        confidence = state.get("email_sentiment_confidence", 0) or 0
+        body = (state.get("current_email").body if state.get("current_email") else "").lower()
+        if category == "customer_complaint":
+            reasons.append("customer complaint")
+        if sentiment in ("negative", "urgent"):
+            reasons.append(f"{sentiment} sentiment")
+        if confidence < 0.6:
+            reasons.append("low sentiment confidence")
+        if any(term in body for term in history_store.SENSITIVE_TERMS):
+            reasons.append("sensitive topic")
+        if state.get("thread_context") and "Previous reply at" in state.get("thread_context", ""):
+            reasons.append("existing thread with prior AI/human reply")
+        return "; ".join(dict.fromkeys(reasons))
+
+    def _needs_human_review(self, state: GraphState) -> bool:
+        return bool(self._human_review_reason(state))
+
+    def route_after_review(self, state: GraphState) -> str:
+        """After proofreading: rewrite if not good; else auto-send (safe) or
+        queue for human review (risky), based on the run mode."""
+        if not state["sendable"]:
+            if state["trials"] >= 3:
+                print(Fore.RED + "Max trials reached — stopping this email." + Style.RESET_ALL)
+                state["emails"].pop()
+                state["writer_messages"] = []
+                return "stop"
+            print(Fore.RED + "Email not good — rewriting..." + Style.RESET_ALL)
+            return "rewrite"
+
+        # Approved by proofreader — decide where it goes.
+        state["emails"].pop()
+        state["writer_messages"] = []
+        mode = state.get("mode", "smart")
+        if mode == "auto":
+            decision = "auto_send"
+        elif mode == "review":
+            decision = "needs_review"
+        else:  # smart
+            reason = self._human_review_reason(state)
+            decision = "needs_review" if reason else "auto_send"
+            state["intervention_reason"] = reason
+        label = "needs HUMAN review" if decision == "needs_review" else "AUTO-SENDING (safe)"
+        print(Fore.GREEN + f"Email approved -> {label}" + Style.RESET_ALL)
+        return decision
+
     def must_rewrite(self, state: GraphState) -> str:
         """Determines if the email needs to be rewritten based on the review and trial count."""
         email_sendable = state["sendable"]
@@ -135,22 +228,95 @@ class Nodes:
             print(Fore.RED + "Email is not good, must rewrite it..." + Style.RESET_ALL)
             return "rewrite"
 
+    def send_email_response(self, state: GraphState) -> GraphState:
+        """Auto-sends the email response directly using Gmail and logs to history."""
+        print(Fore.GREEN + "AUTO-SENDING email response...\n" + Style.RESET_ALL)
+        self.gmail_tools.send_reply(state["current_email"], state["generated_email"])
+        
+        # Log to conversation history
+        _log_conversation({
+            "timestamp": datetime.now().isoformat(),
+            "sender_email": state["current_email"].sender,
+            "sender_subject": state["current_email"].subject,
+            "incoming_body": state["current_email"].body,
+            "category": state["email_category"],
+            "sentiment": state.get("email_sentiment", "unknown"),
+            "sentiment_confidence": state.get("email_sentiment_confidence", 0),
+            "sentiment_summary": state.get("email_sentiment_summary", ""),
+            "generated_reply": state["generated_email"],
+            "status": "auto_sent",
+            "requires_human": False,
+            "human_reason": "",
+            "decision_reason": "Safe enough for AI auto-send after proofreading",
+            "priority": history_store.priority_for_entry({
+                "category": state["email_category"],
+                "sentiment": state.get("email_sentiment", "unknown"),
+                "sentiment_confidence": state.get("email_sentiment_confidence", 0),
+                "incoming_body": state["current_email"].body,
+            }),
+            "thread_id": state["current_email"].threadId,
+            "message_id": state["current_email"].messageId,
+            "references": state["current_email"].references,
+        })
+
+        return {"retrieved_documents": "", "trials": 0}
+
     def create_draft_response(self, state: GraphState) -> GraphState:
-        """Creates a draft response in Gmail."""
+        """Creates a draft response in Gmail and logs to history."""
         print(Fore.YELLOW + "Creating draft email...\n" + Style.RESET_ALL)
         self.gmail_tools.create_draft_reply(state["current_email"], state["generated_email"])
         
-        return {"retrieved_documents": "", "trials": 0}
-
-    def send_email_response(self, state: GraphState) -> GraphState:
-        """Sends the email response directly using Gmail."""
-        print(Fore.YELLOW + "Sending email...\n" + Style.RESET_ALL)
-        self.gmail_tools.send_reply(state["current_email"], state["generated_email"])
+        # Log to conversation history
+        _log_conversation({
+            "timestamp": datetime.now().isoformat(),
+            "sender_email": state["current_email"].sender,
+            "sender_subject": state["current_email"].subject,
+            "incoming_body": state["current_email"].body,
+            "category": state["email_category"],
+            "sentiment": state.get("email_sentiment", "unknown"),
+            "sentiment_confidence": state.get("email_sentiment_confidence", 0),
+            "sentiment_summary": state.get("email_sentiment_summary", ""),
+            "generated_reply": state["generated_email"],
+            "status": "draft",
+            "requires_human": True,
+            "human_reason": state.get("intervention_reason") or "Run mode requires human review",
+            "decision_reason": state.get("intervention_reason") or "Queued for human review",
+            "priority": history_store.priority_for_entry({
+                "category": state["email_category"],
+                "sentiment": state.get("email_sentiment", "unknown"),
+                "sentiment_confidence": state.get("email_sentiment_confidence", 0),
+                "incoming_body": state["current_email"].body,
+            }),
+            "thread_id": state["current_email"].threadId,
+            "message_id": state["current_email"].messageId,
+            "references": state["current_email"].references,
+        })
         
         return {"retrieved_documents": "", "trials": 0}
     
     def skip_unrelated_email(self, state):
         """Skip unrelated email and remove from emails list."""
         print("Skipping unrelated email...\n")
+        
+        current_email = state["emails"][-1]
+        # Log skipped emails too
+        _log_conversation({
+            "timestamp": datetime.now().isoformat(),
+            "sender_email": current_email.sender,
+            "sender_subject": current_email.subject,
+            "incoming_body": current_email.body,
+            "category": "unrelated",
+            "sentiment": "neutral",
+            "sentiment_confidence": 0,
+            "sentiment_summary": "Skipped — unrelated email",
+            "generated_reply": "",
+            "status": "skipped",
+            "requires_human": False,
+            "human_reason": "",
+            "decision_reason": "Unrelated email skipped by classifier",
+            "priority": "low",
+            "thread_id": current_email.threadId,
+        })
+        
         state["emails"].pop()
-        return state# Refined node logic
+        return state

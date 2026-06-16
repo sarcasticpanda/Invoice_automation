@@ -23,14 +23,22 @@ Context: {context}
 """
 
 print("Loading & Chunking Docs...")
-loader = TextLoader("./data/agency.txt")
+from langchain_community.document_loaders import DirectoryLoader
+loader = DirectoryLoader("./data/", glob="*.txt", loader_cls=TextLoader)
 docs = loader.load()
+print(f"Loaded {len(docs)} documents.")
 
 doc_splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
 doc_chunks = doc_splitter.split_documents(docs)
 
 print("Creating vector embeddings...")
-embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+
+print("Creating vector embeddings & saving to ChromaDB...")
+import shutil, os
+if os.path.exists("db"):
+    shutil.rmtree("db")  # Clear old index so we start fresh
+    print("Old DB cleared.")
 
 vectorstore = Chroma.from_documents(doc_chunks, embeddings, persist_directory="db")
 
@@ -38,9 +46,9 @@ vectorstore = Chroma.from_documents(doc_chunks, embeddings, persist_directory="d
 vectorstore_retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
 # Test RAG chain
-print("Test RAG chain...")
+print("\nTest RAG chain...")
 prompt = ChatPromptTemplate.from_template(RAG_SEARCH_PROMPT_TEMPLATE)
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1)
+llm = ChatGoogleGenerativeAI(model="gemini-flash-latest", temperature=0.1)
 
 rag_chain = (
     {"context": vectorstore_retriever, "question": RunnablePassthrough()}
@@ -49,8 +57,16 @@ rag_chain = (
     | StrOutputParser()
 )
 
-query = "What are your pricing options?"
-result = rag_chain.invoke(query)
-print(f"Question: {query}")
-print(f"Answer: {result}")
+# Test with invoice-related questions
+test_queries = [
+    "What is your refund policy?",
+    "How do I dispute an invoice?",
+    "What are your pricing plans?",
+]
+
+for query in test_queries:
+    result = rag_chain.invoke(query)
+    print(f"\nQ: {query}")
+    print(f"A: {result}")
+
 

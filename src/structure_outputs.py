@@ -15,6 +15,27 @@ class CategorizeEmailOutput(BaseModel):
         description="The category assigned to the email, indicating its type based on predefined rules."
     )
 
+# **Sentiment Analysis Output**
+class SentimentLevel(str, Enum):
+    positive = "positive"
+    neutral = "neutral"
+    negative = "negative"
+    urgent = "urgent"
+
+class SentimentOutput(BaseModel):
+    sentiment: SentimentLevel = Field(
+        ...,
+        description="The emotional tone of the email."
+    )
+    confidence: float = Field(
+        ...,
+        description="Confidence score between 0.0 and 1.0 for the sentiment classification."
+    )
+    summary: str = Field(
+        ...,
+        description="A one-sentence summary of the sender's emotional state and intent."
+    )
+
 # **RAG Query Output**
 class RAGQueriesOutput(BaseModel):
     queries: List[str] = Field(
