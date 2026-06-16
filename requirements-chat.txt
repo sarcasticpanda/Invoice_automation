@@ -1,0 +1,13 @@
+# Extra dependencies for the Policy Chat feature.
+#   pip install -r requirements-chat.txt
+#
+# The chat feature reuses what's already in the base requirements.txt:
+#   - retrieval:  langchain_chroma + ChromaDB + HuggingFace embeddings (db_local/)
+#   - LLM:        langchain_google_genai (Gemini)
+#   - HTTP:       httpx (pulled in transitively, pinned here for Supabase REST)
+#
+# Chat history is stored in Supabase via its PostgREST REST API, called
+# directly over httpx. We deliberately do NOT use the `supabase` Python SDK:
+# its httpx/websockets version pins conflict with the Gemini client.
+
+httpx>=0.28.1
