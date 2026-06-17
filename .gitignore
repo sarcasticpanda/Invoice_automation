@@ -1,0 +1,38 @@
+# ─── Secrets / credentials (NEVER commit) ───
+.env
+.env.*
+!.env.example
+token.json
+credentials.json
+
+# ─── Python ───
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ─── Vector stores / local data ───
+db/
+db_local/
+temp_uploads/
+
+# ─── Runtime data (contains real inbox content / regenerated at runtime) ───
+email_history.json
+data/*.pdf
+
+# ─── Not part of the product (separate/abandoned) ───
+reference_project/
+prisma/
+
+# ─── Node / frontend ───
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+
+# ─── Editor / OS ───
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

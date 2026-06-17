@@ -1,46 +1,45 @@
-# How to Run
+# How to Run InvoiceFlow
 
-## Prerequisites
+You need **two terminals** running at the same time: one for the backend (API),
+one for the frontend (the website). Keep both open — if you close the backend,
+the dashboard goes blank ("offline").
 
-- Python 3.7+
-- Groq api key
-- Google Gemini api key (for embeddings)
-- Gmail API credentials
-- Necessary Python libraries (listed in requirements.txt)
+## Terminal 1 — Backend (API on port 5000)
+```powershell
+cd "c:\Users\Lunar Panda\3-Main\invoice_automation"
+.\venv\Scripts\python.exe app_server.py
+```
+Leave this running. It serves all `/api/...` endpoints.
 
-## Setup
+## Terminal 2 — Frontend (website on port 3000)
+```powershell
+cd "c:\Users\Lunar Panda\3-Main\invoice_automation\frontend"
+npm run dev
+```
+Leave this running. Then open **http://localhost:3000** in your browser.
 
-1. Create and activate a virtual environment:
-   sh
-   python -m venv venv
-   source venv/bin/activate  # On Windows use venv\Scripts\activate
-   
+---
 
-2. Install the required packages:
-   sh
-   pip install -r requirements.txt
-   
+## One-time setup (already done, for reference)
+- Python deps:  `.\venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-chat.txt`
+- Frontend deps: `cd frontend; npm install`
+- Index documents into the vector DB: `.\venv\Scripts\python.exe populate_db_local.py`
+- `.env` filled with `GOOGLE_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `MY_EMAIL`.
 
-3. Set up environment variables:
-   Create a .env file in the root directory of the project:
-   env
-   MY_EMAIL=your_email@gmail.com
-   GROQ_API_KEY=your_groq_api_key
-   GOOGLE_API_KEY=your_gemini_api_key
-   
+## Gmail sign-in (needed for the email pipeline)
+The email features need a valid Gmail login. If the dashboard says Gmail isn't
+connected, run this once and approve in the browser:
+```powershell
+.\venv\Scripts\python.exe main.py --no-auto-send
+```
+- `--no-auto-send` → AI replies are saved as **Gmail drafts** for you to review.
+- `--auto-send`    → AI replies are **sent automatically**.
+> Note: the Google OAuth app is in "Testing" mode, so the login expires about
+> every 7 days. To stop that, publish the app (or add yourself as a Test user)
+> in Google Cloud Console → OAuth consent screen.
 
-4. Ensure Gmail API is enabled:
-   Follow [this guide](https://developers.google.com/gmail/api/quickstart/python) to enable Gmail API and obtain your credentials.
+## Running the email pipeline
+- **From the dashboard:** click **Run Once**, or flip **Auto-Polling** on (runs every 60s).
+- **From a terminal:** `.\venv\Scripts\python.exe main.py --no-auto-send`
 
-## Running the Application
-
-1. Start the workflow:
-   sh
-   python main.py
-   
-
-2. Deploy as API:
-   sh
-   python deploy_api.py
-   
-   The workflow api will be running on localhost:8000.
+The pipeline looks at emails from the **last 8 hours** that don't already have a reply.

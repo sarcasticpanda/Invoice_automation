@@ -1,0 +1,124 @@
+**InvoiceFlow — Company Policies, Billing & Support Guide**
+
+---
+
+**ABOUT INVOICEFLOW**
+
+InvoiceFlow is an AI-powered customer support and invoice automation platform. We help businesses automate email responses, process invoices, and manage customer queries efficiently using Retrieval-Augmented Generation (RAG) technology.
+
+---
+
+**PRICING PLANS**
+
+1. Starter Plan — $29/month
+   - Up to 500 emails/month processed
+   - 1 Gmail inbox connected
+   - ChromaDB local vector store
+   - Email draft generation
+
+2. Professional Plan — $79/month
+   - Up to 5,000 emails/month processed
+   - 5 Gmail inboxes connected
+   - Supabase cloud vector store
+   - Sentiment analysis & escalation
+   - Priority support
+
+3. Enterprise Plan — Custom pricing
+   - Unlimited emails
+   - Unlimited inboxes
+   - Dedicated infrastructure
+   - Custom AI model fine-tuning
+   - 24/7 dedicated support
+
+---
+
+**BILLING POLICY**
+
+- All plans are billed monthly on the subscription start date.
+- Annual plans receive a 20% discount.
+- Invoices are sent automatically via email on the billing date.
+- Accepted payment methods: Visa, Mastercard, American Express, PayPal.
+- Late payments (>7 days) result in service suspension.
+- Accounts are terminated after 30 days of non-payment.
+
+---
+
+**REFUND POLICY**
+
+- Full refund available within 14 days of initial purchase if unsatisfied.
+- No refunds after 14 days unless there is a proven service outage.
+- Partial refunds (pro-rated) are available if downgrading mid-cycle.
+- Refund requests must be submitted via email to support@invoiceflow.ai
+- Refunds are processed within 5-7 business days.
+- Refunds are returned to the original payment method only.
+
+---
+
+**CANCELLATION POLICY**
+
+- You can cancel your subscription at any time from the billing dashboard.
+- Cancellation takes effect at the end of the current billing period.
+- No charges are made after cancellation.
+- Your data is retained for 30 days after cancellation before deletion.
+- You can reactivate your account within 30 days without data loss.
+
+---
+
+**INVOICE DISPUTE POLICY**
+
+- Disputes must be raised within 30 days of the invoice date.
+- Email disputes to billing@invoiceflow.ai with your invoice number.
+- We will investigate and respond within 3 business days.
+- Valid disputes result in a credit note or corrected invoice.
+- Repeated billing errors qualify for a service credit.
+
+---
+
+**TECHNICAL SUPPORT**
+
+- Starter Plan: Email support with 48-hour response time.
+- Professional Plan: Email + chat support with 24-hour response time.
+- Enterprise Plan: Phone + email + chat with 4-hour response SLA.
+- Support hours: Monday to Friday, 9 AM to 6 PM IST.
+- Emergency outage support available 24/7 for Enterprise customers.
+
+---
+
+**SERVICE LEVEL AGREEMENT (SLA)**
+
+- Platform uptime guarantee: 99.9% monthly.
+- Scheduled maintenance windows: Sundays 2 AM to 4 AM IST.
+- Outage compensation: 1 day free service credit per hour of unplanned downtime.
+- Maximum compensation: 30 days free service credit per month.
+
+---
+
+**DATA PRIVACY**
+
+- All customer data is encrypted at rest and in transit.
+- We do not sell or share your data with third parties.
+- Email contents processed by AI are not stored permanently.
+- You can request a full data export at any time.
+- GDPR and CCPA compliant.
+
+---
+
+**FREQUENTLY ASKED QUESTIONS**
+
+Q: How do I get a copy of my invoice?
+A: Log into your dashboard and go to Billing > Invoice History. You can download any invoice as a PDF.
+
+Q: Can I upgrade or downgrade my plan anytime?
+A: Yes. Plan changes take effect immediately. Upgrades are charged pro-rated for the remaining billing cycle. Downgrades take effect at the next billing cycle.
+
+Q: What happens if I exceed my email limit?
+A: You will receive an alert at 80% usage. If you exceed the limit, additional emails are charged at $0.01 per email, or you can upgrade your plan.
+
+Q: How do I connect my Gmail account?
+A: Go to Settings > Integrations > Gmail and click "Connect Gmail". Follow the OAuth authorization flow.
+
+Q: My invoice shows an incorrect amount. What should I do?
+A: Email billing@invoiceflow.ai with your invoice number and a description of the discrepancy. We will resolve it within 3 business days.
+
+Q: Can I get a receipt for tax purposes?
+A: Yes. All invoices include your company name, GST/VAT number (if provided), and are tax-compliant.

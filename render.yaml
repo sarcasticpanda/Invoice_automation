@@ -1,0 +1,25 @@
+# Render deployment for the InvoiceFlow FastAPI backend.
+# Render reads this from the repo root. Set the secret env vars in the
+# Render dashboard (they are marked sync:false so they are NOT stored in git).
+services:
+  - type: web
+    name: invoiceflow-api
+    runtime: python
+    plan: free                 # ⚠️ 512MB RAM — torch/sentence-transformers is tight.
+                               #    If it OOMs, upgrade to "starter", or switch to
+                               #    API embeddings (see DEPLOY.md).
+    buildCommand: "pip install -r requirements.txt && python populate_db_local.py"
+    startCommand: "uvicorn app_server:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.10.11"
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: MY_EMAIL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
