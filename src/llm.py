@@ -1,19 +1,20 @@
 """
-Central LLM factory with an automatic backup provider.
+Central LLM factory with cascading fallbacks.
 
-Primary provider via LLM_PROVIDER (groq | gemini). If OPENROUTER_API_KEY is set,
-an OpenRouter model is attached as a **fallback**: when the primary errors
-(e.g. a rate-limit 429), the call automatically retries on OpenRouter.
+Chain: Groq (primary) → OpenRouter (1st fallback) → Gemini (2nd fallback)
+When primary hits rate limit, automatically tries next provider.
 
 Env (.env):
     LLM_PROVIDER=groq                 # primary
     GROQ_MODEL=llama-3.3-70b-versatile
-    GEMINI_MODEL=gemini-2.5-flash-lite
-    OPENROUTER_API_KEY=sk-or-...      # optional backup
-    OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free
+    GOOGLE_API_KEY=...                # Gemini 2nd fallback
+    OPENROUTER_API_KEY=sk-or-...      # optional 1st fallback
+    OPENROUTER_MODEL=openrouter/owl-alpha
 
-Note: OpenRouter's free tier (no credits) is heavily rate-limited, so the
-backup may itself be unavailable — it's best-effort.
+Free tier quotas:
+    - Groq: ~1000/day, 30/min (most reliable)
+    - OpenRouter: ~500/day free (best-effort, may hit limit)
+    - Gemini: ~20/day (last resort, fallback only)
 """
 import os
 from langchain_core.rate_limiters import InMemoryRateLimiter
@@ -46,14 +47,12 @@ def _primary(temperature: float):
     )
 
 
-def _backup(temperature: float):
-    """Build the OpenRouter backup model, or None if no key configured."""
+def _openrouter_fallback(temperature: float):
+    """Build the OpenRouter fallback model, or None if no key configured."""
     key = os.getenv("OPENROUTER_API_KEY")
     if not key:
         return None
     from langchain_openai import ChatOpenAI
-    # Free OpenRouter "stealth" model occasionally returns a transient error;
-    # extra retries make it reliable enough as a free backup.
     return ChatOpenAI(
         model=os.getenv("OPENROUTER_MODEL", "openrouter/owl-alpha"),
         api_key=key,
@@ -64,23 +63,52 @@ def _backup(temperature: float):
     )
 
 
+def _gemini_fallback(temperature: float):
+    """Build the Gemini fallback model, or None if no key configured."""
+    key = os.getenv("GOOGLE_API_KEY")
+    if not key:
+        return None
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    return ChatGoogleGenerativeAI(
+        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite"),
+        api_key=key,
+        temperature=temperature,
+        max_retries=3,
+        rate_limiter=_rate_limiter(0.05),
+    )
+
+
 def get_llm(temperature: float = 0.1):
-    """Plain chat model (primary, with OpenRouter fallback if configured)."""
+    """Plain chat model with cascading fallbacks: Groq → OpenRouter → Gemini."""
     primary = _primary(temperature)
-    backup = _backup(temperature)
-    return primary.with_fallbacks([backup]) if backup is not None else primary
+    fallbacks = []
+    openrouter = _openrouter_fallback(temperature)
+    if openrouter:
+        fallbacks.append(openrouter)
+    gemini = _gemini_fallback(temperature)
+    if gemini:
+        fallbacks.append(gemini)
+    return primary.with_fallbacks(fallbacks) if fallbacks else primary
 
 
 def get_structured_llm(schema, temperature: float = 0.1):
-    """Structured-output model (primary, with OpenRouter fallback if configured).
-    Primary (Groq) uses tool-calling; the OpenRouter backup uses json_schema mode
-    (owl-alpha doesn't reliably tool-call). Both return the same pydantic type."""
+    """Structured-output model with cascading fallbacks.
+    Groq uses tool-calling; OpenRouter uses json_schema mode; Gemini uses default."""
     primary = _primary(temperature).with_structured_output(schema)
-    backup = _backup(temperature)
-    if backup is None:
-        return primary
-    try:
-        backup_structured = backup.with_structured_output(schema, method="json_schema")
-    except Exception:
-        backup_structured = backup.with_structured_output(schema)
-    return primary.with_fallbacks([backup_structured])
+    fallbacks = []
+
+    openrouter = _openrouter_fallback(temperature)
+    if openrouter:
+        try:
+            fallbacks.append(openrouter.with_structured_output(schema, method="json_schema"))
+        except Exception:
+            fallbacks.append(openrouter.with_structured_output(schema))
+
+    gemini = _gemini_fallback(temperature)
+    if gemini:
+        try:
+            fallbacks.append(gemini.with_structured_output(schema))
+        except Exception:
+            pass
+
+    return primary.with_fallbacks(fallbacks) if fallbacks else primary
