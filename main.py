@@ -65,10 +65,10 @@ try:
     print(Fore.GREEN + "\nPipeline complete." + Style.RESET_ALL)
 except Exception as e:
     msg = str(e)
-    if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
-        # Quota hit — stop cleanly. Emails already drafted/sent this run are saved.
-        print(Fore.YELLOW + "\nStopped early: Google Gemini quota reached for now. "
-              "Already-processed emails are saved. Enable billing on the Google "
-              "project or try again later (free quota resets daily)." + Style.RESET_ALL)
+    if "RESOURCE_EXHAUSTED" in msg or "429" in msg or "rate limit" in msg.lower():
+        # Rate/quota hit — stop cleanly. Emails already handled this run are saved.
+        print(Fore.YELLOW + "\nStopped early: AI provider rate/quota limit reached. "
+              "Already-processed emails are saved. Wait a minute and run again, or "
+              "raise the limit (the free Groq tier resets quickly)." + Style.RESET_ALL)
     else:
         print(Fore.RED + f"\nPipeline stopped on an error: {msg[:300]}" + Style.RESET_ALL)

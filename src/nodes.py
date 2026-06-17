@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from colorama import Fore, Style
 from .agents import Agents
@@ -33,6 +34,13 @@ class Nodes:
         # tier means we can process the whole recent batch, so the default is high.
         limit = int(os.getenv("MAX_EMAILS_PER_RUN", "25"))
         recent_emails = recent_emails[:limit]
+        # Trim very long bodies (newsletters can be ~10k chars) so we stay under
+        # the LLM provider's tokens-per-minute limit. Real support questions are
+        # short, so they're unaffected. Configurable via MAX_EMAIL_BODY_CHARS.
+        max_body = int(os.getenv("MAX_EMAIL_BODY_CHARS", "2500"))
+        for em in recent_emails:
+            if em.get("body") and len(em["body"]) > max_body:
+                em["body"] = em["body"][:max_body]
         print(Fore.YELLOW + f"Processing {len(recent_emails)} email(s) this run.\n" + Style.RESET_ALL)
         emails = [Email(**email) for email in recent_emails]
         return {"emails": emails}
