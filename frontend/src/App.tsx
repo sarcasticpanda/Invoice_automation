@@ -7,6 +7,8 @@ import Documents from './pages/Documents'
 import RAGQuery from './pages/RAGQuery'
 import Chat from './pages/Chat'
 import ReviewQueue from './pages/ReviewQueue'
+import Threads from './pages/Threads'
+import ThreadDetail from './pages/ThreadDetail'
 import './index.css'
 
 export default function App() {
@@ -15,6 +17,8 @@ export default function App() {
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/threads" element={<Threads />} />
+          <Route path="/threads/:id" element={<ThreadDetail />} />
           <Route path="/review" element={<ReviewQueue />} />
           <Route path="/history" element={<History />} />
           <Route path="/history/:email" element={<ContactDetail />} />
