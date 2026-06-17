@@ -170,7 +170,21 @@ class GmailToolsClass:
         return build('gmail', 'v1', credentials=creds)
     
     def _should_skip_email(self, email_info):
-        return os.environ['MY_EMAIL'] in email_info['sender']
+        sender = (email_info.get('sender') or '').lower()
+        # Skip our own outgoing mail.
+        if os.environ['MY_EMAIL'] in sender:
+            return True
+        # Skip bulk/marketing mail before it ever reaches the AI: real customer
+        # support emails come from people, not no-reply/newsletter senders, and
+        # don't carry a List-Unsubscribe header. This also saves LLM tokens.
+        if email_info.get('list_unsubscribe'):
+            return True
+        bulk_markers = (
+            'no-reply', 'noreply', 'donotreply', 'do-not-reply', 'newsletter',
+            'notifications', 'notification', 'mailer', 'mailer-daemon', 'bounce',
+            'jobalerts', 'job-alerts', 'updates@', 'alerts@', 'news@', 'info@minis',
+        )
+        return any(m in sender for m in bulk_markers)
 
     def _get_email_info(self, msg_id):
         message = self.service.users().messages().get(
@@ -187,6 +201,7 @@ class GmailToolsClass:
             "references": headers.get("references", ""),
             "sender": headers.get("from", "Unknown"),
             "subject": headers.get("subject", "No Subject"),
+            "list_unsubscribe": headers.get("list-unsubscribe", ""),
             "body": self._get_email_body(payload),
         }
     

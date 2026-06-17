@@ -13,9 +13,10 @@ class Agents():
     def __init__(self):
         # Choose which LLMs to use for each agent
         print("Initializing Agents...")
-        # LLM provider is configurable via LLM_PROVIDER in .env (default: groq,
-        # which has a far more generous free tier than Gemini's ~20/day).
-        from .llm import get_llm
+        # LLM provider is configurable via LLM_PROVIDER in .env (default: groq).
+        # get_structured_llm() adds the OpenRouter fallback for structured chains;
+        # get_llm() does the same for the plain RAG-answer chain.
+        from .llm import get_llm, get_structured_llm
         llama = get_llm(temperature=0.1)
         
         print("Loading HuggingFaceEmbeddings...")
@@ -34,7 +35,7 @@ class Agents():
         )
         self.categorize_email = (
             email_category_prompt | 
-            llama.with_structured_output(CategorizeEmailOutput)
+            get_structured_llm(CategorizeEmailOutput, 0.1)
         )
 
         # Sentiment analysis chain
@@ -44,7 +45,7 @@ class Agents():
         )
         self.analyze_sentiment = (
             sentiment_prompt |
-            llama.with_structured_output(SentimentOutput)
+            get_structured_llm(SentimentOutput, 0.1)
         )
 
         # Used to design queries for RAG retrieval
@@ -54,7 +55,7 @@ class Agents():
         )
         self.design_rag_queries = (
             generate_query_prompt | 
-            llama.with_structured_output(RAGQueriesOutput)
+            get_structured_llm(RAGQueriesOutput, 0.1)
         )
         
         # Generate answer to queries using RAG
@@ -76,7 +77,7 @@ class Agents():
         )
         self.email_writer = (
             writer_prompt | 
-            llama.with_structured_output(WriterOutput)
+            get_structured_llm(WriterOutput, 0.1)
         )
 
         # Verify the generated email
@@ -86,5 +87,5 @@ class Agents():
         )
         self.email_proofreader = (
             proofreader_prompt | 
-            llama.with_structured_output(ProofReaderOutput) 
+            get_structured_llm(ProofReaderOutput, 0.1) 
         )
