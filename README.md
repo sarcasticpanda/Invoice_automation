@@ -21,9 +21,26 @@
 
 ## About
 
-InvoiceFlow is an end-to-end **AI email automation system** built for customer support teams. It connects to Gmail, reads incoming emails, understands intent using NLP, retrieves relevant context from your business documents via RAG, drafts contextual replies with an LLM, self-corrects them, and either auto-sends or queues for human approval. The entire pipeline is orchestrated by a **LangGraph state machine** — deterministic, auditable, and fully under your control.
+**InvoiceFlow** automates customer email replies using AI. It reads your Gmail inbox, understands what each customer needs, searches your business documents for answers, drafts contextual replies, self-corrects them, and sends safe ones automatically — or queues sensitive ones for your approval. Built on LangGraph for a deterministic, fully auditable pipeline you can trust.
 
-**One button to process your inbox. One dashboard to manage everything.**
+---
+
+## See It In Action
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/dashboard.png"/><p align="center"><em><strong>Command Center</strong><br/>One click to process inbox</em></p></td>
+<td width="50%"><img src="docs/screenshots/dashboard-dark.png"/><p align="center"><em><strong>Dark Mode</strong><br/>Glassmorphism design</em></p></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/inbox.png"/><p align="center"><em><strong>AI Inbox</strong><br/>Threaded conversations</em></p></td>
+<td><img src="docs/screenshots/analytics.png"/><p align="center"><em><strong>Analytics</strong><br/>Sentiment & automation trends</em></p></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/review-queue.png"/><p align="center"><em><strong>Human Review</strong><br/>Edit & approve drafts</em></p></td>
+<td><img src="docs/screenshots/policy-chat.png"/><p align="center"><em><strong>Policy Chat</strong><br/>RAG Q&A over your docs</em></p></td>
+</tr>
+</table>
 
 ---
 
@@ -221,25 +238,6 @@ All LLM calls use Pydantic schemas with `with_structured_output`:
 | `ProofreaderResult` | `sendable: bool`, `feedback: str` |
 
 **Guaranteed JSON responses** → **deterministic routing** → **no parsing errors**.
-
----
-
-## Dashboard Features
-
-<table>
-<tr>
-<td width="50%"><img src="docs/screenshots/dashboard.png" alt="Dashboard"/><p align="center"><em><strong>Command Center</strong><br/>Pipeline stats & trigger</em></p></td>
-<td width="50%"><img src="docs/screenshots/dashboard-dark.png" alt="Dark Mode"/><p align="center"><em><strong>Dark Mode</strong><br/>Glassmorphism design</em></p></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/inbox.png" alt="AI Inbox"/><p align="center"><em><strong>AI Inbox</strong><br/>Threaded view, filters</em></p></td>
-<td><img src="docs/screenshots/analytics.png" alt="Analytics"/><p align="center"><em><strong>Analytics</strong><br/>Sentiment & trends</em></p></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/review-queue.png" alt="Review Queue"/><p align="center"><em><strong>Human Review Queue</strong><br/>Edit & approve drafts</em></p></td>
-<td><img src="docs/screenshots/policy-chat.png" alt="Policy Chat"/><p align="center"><em><strong>Policy Chat</strong><br/>RAG assistant</em></p></td>
-</tr>
-</table>
 
 ---
 
