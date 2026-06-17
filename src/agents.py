@@ -27,6 +27,7 @@ class Agents():
         vectorstore = Chroma(persist_directory="db_local", embedding_function=embeddings)
         print("Initializing retriever...")
         retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+        self.retriever = retriever  # exposed so nodes can retrieve docs without an LLM call
 
         # Categorize email chain
         email_category_prompt = PromptTemplate(

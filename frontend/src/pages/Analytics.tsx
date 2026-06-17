@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
 import {
   Zap, UserCheck, Clock3, Mail, TrendingUp, Loader2, IndianRupee, Users, PieChart as PieIcon,
@@ -33,6 +34,7 @@ const tooltipStyle = { backgroundColor: 'rgba(10,10,12,0.92)', border: '1px soli
 const card = (i: number) => ({ initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, transition: { delay: 0.08 * i, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } })
 
 export default function Analytics() {
+  const navigate = useNavigate()
   const [a, setA] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -139,13 +141,14 @@ export default function Analytics() {
           <div className="flex items-center gap-2 mb-5"><Users className="w-5 h-5 text-brand" /><h3 className="font-semibold text-white/90">Top Contacts</h3></div>
           <div className="space-y-2">
             {(a.top_customers || []).slice(0, 7).map((c, i) => (
-              <div key={c.email} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+              <button key={c.email} onClick={() => navigate(`/history/${encodeURIComponent(c.email)}`)}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/15 transition-colors text-left">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-7 h-7 rounded-full bg-white/5 flex items-center justify-center text-xs font-semibold text-white/70 shrink-0">{i + 1}</span>
                   <span className="text-sm text-white/70 truncate">{c.email}</span>
                 </div>
-                <span className="text-xs text-white/40 shrink-0">{c.count} msg</span>
-              </div>
+                <span className="text-xs text-white/40 shrink-0">{c.count} msg →</span>
+              </button>
             ))}
             {(a.top_customers || []).length === 0 && <p className="text-sm text-white/30">No contacts yet.</p>}
           </div>

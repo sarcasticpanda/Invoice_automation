@@ -24,6 +24,7 @@ const TABS = [
   { key: 'auto_handled', label: 'Auto-Handled' },
   { key: 'sent', label: 'Sent' },
   { key: 'draft', label: 'Drafts' },
+  { key: 'rejected', label: 'Rejected' },
   { key: 'skipped', label: 'Skipped' },
 ]
 

@@ -105,18 +105,22 @@ class Nodes:
         print(Fore.YELLOW + "Designing RAG query...\n" + Style.RESET_ALL)
         email_content = state["current_email"].body
         query_result = self.agents.design_rag_queries.invoke({"email": email_content})
-        
-        return {"rag_queries": query_result.queries}
+        # Cap to 2 queries — fewer retrievals, faster, less token use.
+        return {"rag_queries": (query_result.queries or [])[:2]}
 
     def retrieve_from_rag(self, state: GraphState) -> GraphState:
-        """Retrieves information from internal knowledge based on RAG questions."""
+        """Retrieves relevant document snippets for the queries. Uses vector
+        search only (no per-query LLM synthesis) — the writer reads the raw
+        snippets, which is much faster and avoids extra LLM calls."""
         print(Fore.YELLOW + "Retrieving information from internal knowledge...\n" + Style.RESET_ALL)
-        final_answer = ""
+        seen, chunks = set(), []
         for query in state["rag_queries"]:
-            rag_result = self.agents.generate_rag_answer.invoke(query)
-            final_answer += query + "\n" + rag_result + "\n\n"
-        
-        return {"retrieved_documents": final_answer}
+            for doc in self.agents.retriever.invoke(query):
+                key = doc.page_content[:60]
+                if key not in seen:
+                    seen.add(key)
+                    chunks.append(doc.page_content)
+        return {"retrieved_documents": "\n\n".join(chunks) or "No relevant documents found."}
 
     def write_draft_email(self, state: GraphState) -> GraphState:
         """Writes a draft email based on the current email and retrieved information."""

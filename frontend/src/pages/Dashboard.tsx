@@ -172,14 +172,14 @@ export default function Dashboard() {
               <div className="text-lg font-semibold text-amber-400">{stats.needs_review ?? stats.emails_drafted}</div>
             </div>
           </div>
-          <div className="liquid-glass rounded-xl p-5 flex items-center gap-4">
+          <div onClick={() => navigate('/threads?status=skipped')} className="liquid-glass rounded-xl p-5 flex items-center gap-4 cursor-pointer hover:border-white/20 transition-colors">
             <SkipForward className="w-5 h-5 text-white/30" />
             <div>
               <div className="text-sm text-white/50">Skipped</div>
               <div className="text-lg font-semibold">{stats.emails_skipped}</div>
             </div>
           </div>
-          <div className="liquid-glass rounded-xl p-5 flex items-center gap-4">
+          <div onClick={() => navigate('/threads?status=rejected')} className="liquid-glass rounded-xl p-5 flex items-center gap-4 cursor-pointer hover:border-white/20 transition-colors">
             <XCircle className="w-5 h-5 text-white/30" />
             <div>
               <div className="text-sm text-white/50">Rejected</div>

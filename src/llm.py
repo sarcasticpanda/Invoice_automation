@@ -37,11 +37,12 @@ def _primary(temperature: float):
             temperature=temperature, max_retries=3, rate_limiter=_rate_limiter(0.15),
         )
     from langchain_groq import ChatGroq
-    # ~8 req/min and 6 retries: paces RAG-heavy runs under the free per-minute
-    # token limit so a reply completes instead of erroring out mid-way.
+    # Pace calls (~8/min) + retry so a RAG reply's burst of calls stays under the
+    # free per-minute token limit and COMPLETES, rather than failing over to the
+    # (also throttled) free backup. Trades a little speed for reliability.
     return ChatGroq(
         model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-        temperature=temperature, max_retries=6, rate_limiter=_rate_limiter(0.13),
+        temperature=temperature, max_retries=4, rate_limiter=_rate_limiter(0.15),
     )
 
 
@@ -51,13 +52,15 @@ def _backup(temperature: float):
     if not key:
         return None
     from langchain_openai import ChatOpenAI
+    # Free OpenRouter "stealth" model occasionally returns a transient error;
+    # extra retries make it reliable enough as a free backup.
     return ChatOpenAI(
-        model=os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free"),
+        model=os.getenv("OPENROUTER_MODEL", "openrouter/owl-alpha"),
         api_key=key,
         base_url="https://openrouter.ai/api/v1",
         temperature=temperature,
-        max_retries=2,
-        timeout=40,
+        max_retries=4,
+        timeout=60,
     )
 
 
@@ -70,10 +73,14 @@ def get_llm(temperature: float = 0.1):
 
 def get_structured_llm(schema, temperature: float = 0.1):
     """Structured-output model (primary, with OpenRouter fallback if configured).
-    Fallbacks are applied AFTER with_structured_output so both paths return the
-    same pydantic type."""
+    Primary (Groq) uses tool-calling; the OpenRouter backup uses json_schema mode
+    (owl-alpha doesn't reliably tool-call). Both return the same pydantic type."""
     primary = _primary(temperature).with_structured_output(schema)
     backup = _backup(temperature)
     if backup is None:
         return primary
-    return primary.with_fallbacks([backup.with_structured_output(schema)])
+    try:
+        backup_structured = backup.with_structured_output(schema, method="json_schema")
+    except Exception:
+        backup_structured = backup.with_structured_output(schema)
+    return primary.with_fallbacks([backup_structured])
