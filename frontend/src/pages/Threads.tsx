@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'motion/react'
 import { Inbox, Search, ChevronRight, AlertTriangle, Loader2, MessageSquare } from 'lucide-react'
 
@@ -62,9 +62,11 @@ const fmt = (iso: string) => {
 
 export default function Threads() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const initialTab = TABS.some(t => t.key === searchParams.get('status')) ? searchParams.get('status')! : 'needs_review'
   const [threads, setThreads] = useState<Thread[]>([])
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('needs_review')
+  const [tab, setTab] = useState(initialTab)
   const [dateRange, setDateRange] = useState('all')
   const [search, setSearch] = useState('')
 

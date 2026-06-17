@@ -16,9 +16,9 @@ interface Stats {
 }
 
 const statCards = [
-  { key: 'needs_review', label: 'Needs Review', icon: Inbox, color: 'from-amber-500 to-orange-600', to: '/review' },
-  { key: 'emails_sent', label: 'Sent / Resolved', icon: Send, color: 'from-emerald-500 to-green-600', to: '/history' },
-  { key: 'total_processed', label: 'Total Processed', icon: Mail, color: 'from-brand to-blue-600', to: '/history' },
+  { key: 'needs_review', label: 'Needs Review', icon: Inbox, color: 'from-amber-500 to-orange-600', to: '/threads?status=needs_review' },
+  { key: 'emails_sent', label: 'Sent / Resolved', icon: Send, color: 'from-emerald-500 to-green-600', to: '/threads?status=sent' },
+  { key: 'total_processed', label: 'Total Processed', icon: Mail, color: 'from-brand to-blue-600', to: '/threads?status=all' },
   { key: 'total_docs', label: 'Documents', icon: FileText, color: 'from-purple-500 to-violet-600', to: '/documents' },
 ]
 

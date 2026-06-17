@@ -1,11 +1,12 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'motion/react'
-import { LayoutDashboard, Clock, FileText, Search, MessageSquare, Inbox, Layers, Zap, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Clock, FileText, Search, MessageSquare, Inbox, Layers, BarChart3, Zap, Sparkles } from 'lucide-react'
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/threads', label: 'AI Inbox', icon: Layers },
   { path: '/review', label: 'Review Queue', icon: Inbox },
+  { path: '/analytics', label: 'Analytics', icon: BarChart3 },
   { path: '/history', label: 'Email History', icon: Clock },
   { path: '/documents', label: 'Documents', icon: FileText },
   { path: '/rag', label: 'RAG Query', icon: Search },
