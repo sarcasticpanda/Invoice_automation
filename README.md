@@ -11,8 +11,6 @@
 [![Gemini](https://img.shields.io/badge/Gemini-2.0_Flash-4285F4?style=flat&logo=google&logoColor=white)](https://ai.google.dev)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector_Store-E56717?style=flat)](https://www.trychroma.com)
 
-**InvoiceFlow** is an end-to-end AI email automation system. It connects to a Gmail inbox, reads incoming customer emails, understands their intent, retrieves relevant context from your business documents, writes tailored replies, proofreads them, and either sends automatically or queues for human approval — all orchestrated by a LangGraph state machine.
-
 </div>
 
 ---
@@ -21,176 +19,225 @@
 
 ---
 
-## The Problem It Solves
+## About
 
-Customer-facing teams spend hours each day answering repetitive emails — order enquiries, refund requests, policy questions. These emails follow predictable patterns, yet each one needs a personalised, accurate reply. InvoiceFlow automates the entire loop while keeping humans in control of anything sensitive.
+InvoiceFlow is an end-to-end **AI email automation system** built for customer support teams. It connects to Gmail, reads incoming emails, understands intent using NLP, retrieves relevant context from your business documents via RAG, drafts contextual replies with an LLM, self-corrects them, and either auto-sends or queues for human approval. The entire pipeline is orchestrated by a **LangGraph state machine** — deterministic, auditable, and fully under your control.
+
+**One button to process your inbox. One dashboard to manage everything.**
+
+---
+
+## Features at a Glance
+
+| Feature | What it Does |
+|---|---|
+| **Automated Email Processing** | Reads Gmail inbox, categorizes, drafts, and sends replies (or queues them) |
+| **RAG-Powered Replies** | Grounds responses in your business documents, not generic LLM knowledge |
+| **Self-Correcting Writer** | AI drafts reply → proofreader checks it → if needed, writer revises (up to 3 retries) |
+| **Smart Auto-Send** | Safe replies sent automatically; sensitive ones (refunds, legal, etc.) queue for approval |
+| **Threaded Inbox View** | All emails grouped by conversation with status, priority, sentiment |
+| **Human Review Queue** | Edit, approve, or reject any AI draft before it goes to the customer |
+| **Analytics Dashboard** | Automation rate, time saved, category breakdown, sentiment trends |
+| **Contact Intelligence** | Per-contact history and sentiment analysis |
+| **Policy Chat** | Multi-turn RAG chat — ask questions about your business documents |
+| **Knowledge Base** | Upload/manage PDFs, TXTs, DOCXs from the dashboard |
+| **Light & Dark Mode** | Glassmorphism UI with animated background |
+| **Multi-User Auth** | Google OAuth login; each user has isolated data |
 
 ---
 
 ## How It Works
 
-InvoiceFlow is built as a **directed graph** using LangGraph. Each email flows through a series of nodes, and routing decisions are made based on the output of each step.
+InvoiceFlow processes each email through a **directed graph**. Every decision point uses structured LLM output to route to the next node.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Gmail Inbox (last 8 hrs)                   │
-└──────────────────────────┬──────────────────────────────────────┘
-                           │
-                    load_inbox_emails
-                           │
-               ┌─────── empty? ───────┐
-               │ yes                  │ no
-               ▼                      ▼
-              END            categorize_email
-                                      │
-                             analyze_sentiment
-                                      │
-              ┌───────────────────────┼───────────────────────┐
-              │                       │                       │
-       product_enquiry         complaint /              unrelated
-              │                  feedback                     │
-              ▼                       │               skip + next email
-   construct_rag_queries              │
-              │                       │
-    retrieve_from_rag                 │
-              │                       │
-              └───────────┬───────────┘
-                          ▼
-                     email_writer
-                          │
-                  email_proofreader
-                   /      |       \
-                send    rewrite   stop
-                 │        │         │
-           send_email  (retry,    give up,
-                │      max 3)    next email
-                │
-           back to inbox loop
+                           GMAIL INBOX (last 8 hours)
+                                    │
+                                    ▼
+                            Load Unanswered Threads
+                                    │
+                         ┌──────────┴──────────┐
+                         │                     │
+                    Empty?                 No: Process
+                         │                     │
+                      END                      ▼
+                                         Categorize Email
+                                         (4 categories)
+                                                 │
+                                                 ▼
+                                          Analyze Sentiment
+                                                 │
+                    ┌────────────────────┬──────┴──────┬─────────────────┐
+                    │                    │             │                 │
+            Product Enquiry         Complaint      Feedback         Unrelated
+                    │                    │             │                 │
+                    ▼                    │             │                 ▼
+           Construct RAG Queries         │             │            Skip Email
+                    │                    │             │             (next)
+                    ▼                    │             │
+            Retrieve from Chroma         │             │
+            (top-k relevant chunks)      │             │
+                    │                    │             │
+                    └────────────────────┴──────┬──────┘
+                                                 │
+                                                 ▼
+                                           Draft Reply
+                                        (using context)
+                                                 │
+                                                 ▼
+                                          Proofread Draft
+                                                 │
+                    ┌────────────────┬──────────┴──────────┬──────────────┐
+                    │                │                     │              │
+               Sendable          Not Sendable         No Confidence     Failed
+                    │                │                     │              │
+                    ▼                ▼                     ▼              ▼
+                 SEND          Get Feedback         Queue for Review   Give Up
+                    │          & Retry (max 3)            │            (flag)
+                    │                │                     │              │
+                    └────────────────┴─────────────────────┴──────────────┘
+                                     │
+                              Back to Inbox
+                              (next thread)
 ```
 
-### Node-by-Node Breakdown
-
-| Node | What it does |
-|---|---|
-| `load_inbox_emails` | Fetches unanswered Gmail threads from the last 8 hours; skips threads that already have a draft reply |
-| `categorize_email` | Classifies the email into one of four categories using the LLM with structured output |
-| `analyze_sentiment` | Detects tone (positive / neutral / negative / urgent) and routes accordingly |
-| `construct_rag_queries` | For product enquiries: generates 2–3 targeted search queries from the email body |
-| `retrieve_from_rag` | Runs queries against ChromaDB; returns top-k relevant document chunks |
-| `email_writer` | Drafts a reply using the email, retrieved context, and prior draft+feedback history |
-| `email_proofreader` | Evaluates the draft for tone, accuracy, and completeness; returns a `sendable` flag |
-| `send_email` / `create_draft` | Either sends the reply via Gmail API or saves it as a Gmail draft for human review |
+**Every email flows through this graph. No email is processed the same way twice.**
 
 ---
 
-## Email Handling by Category
+## Processing Pipeline: Step by Step
 
-### Product Enquiries
-When a customer asks about products, policies, pricing, or procedures — the pipeline triggers the full **RAG retrieval** path. It constructs specific search queries, retrieves the most relevant chunks from the vector store, and passes that context directly into the email writer. The reply is grounded in your actual business documents.
+### 1. **Categorization**
+The LLM classifies each email into one of four categories:
+- **Product Enquiry** — questions about products, pricing, policies, or procedures
+- **Complaint** — customer expressing dissatisfaction or reporting issues
+- **Feedback** — suggestions, praise, or general comments
+- **Unrelated** — spam, off-topic, or already resolved threads
 
-### Complaints & Feedback
-Emails expressing dissatisfaction skip the RAG step (no document lookup needed) and go straight to the writer. The sentiment analysis node flags these as `negative` or `urgent`, which lowers the auto-send threshold — they are more likely to be queued for human review.
+### 2. **Sentiment Analysis**
+Detects emotional tone: positive, neutral, negative, or urgent. Negative/urgent emails are flagged for human review even if auto-send is enabled.
 
-### Unrelated Emails
-Emails that are spam, off-topic, or already resolved are silently skipped. The graph routes them to a `skip_unrelated_email` node that pops them from the inbox stack without writing any reply.
+### 3. **Conditional RAG Retrieval** *(Product Enquiries Only)*
+- LLM generates 2–3 targeted search queries from the email body
+- Queries run against ChromaDB (your document vector store)
+- Top-k results returned and concatenated as context
+- Context passed to email writer for grounded responses
 
-### Sensitive Keywords
-A separate **smart-send guard** checks for terms like `refund`, `chargeback`, `legal`, `cancel subscription`, `delete account`. Any email containing these — regardless of category — is saved as a draft and surfaced in the Human Review Queue rather than being auto-sent.
+### 4. **Email Writer**
+Drafts a reply using:
+- Original email + customer context
+- Retrieved document chunks (if applicable)
+- Prior draft + proofreader feedback history (on retries)
+
+### 5. **Email Proofreader**
+Checks the draft for:
+- Tone appropriateness (not defensive, not too casual)
+- Accuracy (doesn't contradict your docs)
+- Completeness (answers the customer's question)
+- Returns: `sendable: bool` + `feedback: str`
+
+### 6. **Self-Correction Loop**
+If proofreader says `sendable = False`:
+- Feedback is appended to `writer_messages`
+- Writer revises using that feedback
+- Proofreader re-evaluates
+- Up to **3 retries**, then gives up and flags for human review
+
+### 7. **Send or Draft**
+- **Auto-send mode**: Sends directly via Gmail API
+- **Draft mode**: Saves as Gmail draft for human approval
+- **Review mode**: Queues in Human Review Queue dashboard
 
 ---
 
-## Self-Correcting Reply Loop
+## Email Handling: The Details
 
-The writer and proofreader form a **feedback loop**:
+### Product Enquiries (with RAG)
+When a customer asks about your products or policies, InvoiceFlow:
+1. Generates specific search queries from the email body
+2. Retrieves relevant chunks from your ChromaDB (your uploaded PDFs/docs)
+3. Passes those chunks to the email writer as context
+4. Result: responses grounded in **your actual business knowledge**, not generic LLM answers
 
-1. Writer drafts a reply
-2. Proofreader evaluates: is it accurate? Appropriate tone? Does it answer the question?
-3. If `sendable = False` → proofreader returns specific feedback → writer revises using that feedback
-4. Loop repeats up to **3 times**
-5. If still not sendable after 3 attempts → the email is skipped and flagged
+### Complaints & Feedback (skips RAG)
+These bypass document lookup (no need for retrieval) and go straight to the writer. The sentiment analysis flags them as negative/urgent, lowering the auto-send threshold — they're more likely to get queued for human review.
 
-The writer sees the full conversation history (`writer_messages`) across retries, so each revision improves on the previous one.
+### Unrelated Emails (skipped)
+Spam, off-topic, or resolved threads are silently skipped without generating any reply.
+
+### Smart Auto-Send Guard
+A separate **sensitive keyword detector** checks for terms like:
+- `refund`, `chargeback`, `billing issue`
+- `cancel`, `delete account`, `unsubscribe`
+- `legal`, `lawsuit`, `GDPR`, `privacy`
+
+Any email containing these is **always queued for review**, regardless of category or confidence.
 
 ---
 
 ## RAG System
 
-### Vector Database
-**ChromaDB** (persistent, local) is used as the vector store. It stores document chunks with metadata (source filename, chunk index) and supports semantic similarity search.
+### Vector Store: ChromaDB
+- **Local persistent database** — no external APIs for retrieval
+- **Metadata tagging** — each chunk stores source filename and position
+- **Semantic search** — similarity search returns top-k most relevant chunks
+- **Path**: `db_local/`
 
-Path: `db_local/`
+### Embeddings: HuggingFace all-MiniLM-L6-v2
+- **Dimension**: 384-dimensional vectors
+- **Model size**: ~90 MB, runs locally on startup
+- **No API calls needed** — embeddings computed on your machine
+- **Perfect for business documents** — semantic understanding of domain-specific language
 
-### Embeddings
-**HuggingFace `all-MiniLM-L6-v2`** (384-dimensional vectors) via `sentence-transformers`. This model runs locally — no API calls needed for retrieval.
-
-- Model size: ~90 MB
-- Embedding dimension: 384
-- Loaded once on startup and reused across all queries
-
-### Document Processing
-Upload flow (`populate_db_local.py`):
-1. Accept PDF, TXT, or DOCX
-2. Extract raw text (PyPDF / python-docx)
-3. Chunk with `RecursiveCharacterTextSplitter` (500 chars, 50 overlap)
-4. Embed all chunks with HuggingFace
+### Document Processing Pipeline
+1. Upload PDF / TXT / DOCX via dashboard
+2. Extract raw text (PyPDF for PDFs, python-docx for DOCX)
+3. Split into chunks: 500 characters, 50-character overlap
+4. Embed with HuggingFace model
 5. Store in ChromaDB with source metadata
-
-### Retrieval
-For each product enquiry:
-- 2–3 queries are constructed by the LLM from the email body
-- Each query runs `similarity_search(k=3)` against ChromaDB
-- Top results are concatenated and passed to the email writer as context
+6. **Immediately available** for RAG queries
 
 ---
 
 ## LLM Layer
 
-**Primary:** Google Gemini 2.0 Flash (`gemini-2.0-flash`) via `langchain-google-genai`
-**Fallback chain:** OpenRouter (`meta-llama/llama-3.3-70b-instruct:free`) → Groq (`llama-3.3-70b-versatile`)
+### Primary: Google Gemini 2.0 Flash
+`langchain-google-genai` integration. Fast, cost-effective, and supports **structured output** (JSON schemas).
 
-All LLM calls use **structured output** (`with_structured_output`) with Pydantic schemas, guaranteeing consistent JSON responses that the graph can route on:
+### Fallback Chain
+If Gemini is unavailable:
+1. **OpenRouter** (`meta-llama/llama-3.3-70b-instruct:free`)
+2. **Groq** (`llama-3.3-70b-versatile`)
 
-| Schema | Fields |
+### Structured Output
+All LLM calls use Pydantic schemas with `with_structured_output`:
+
+| Schema | Output |
 |---|---|
 | `EmailCategory` | `category: Literal["product_enquiry", "complaint", "feedback", "unrelated"]` |
-| `SentimentResult` | `sentiment`, `confidence`, `summary` |
+| `SentimentResult` | `sentiment`, `confidence: float`, `summary: str` |
 | `RAGQueries` | `queries: list[str]` |
 | `WriterResult` | `reply: str` |
 | `ProofreaderResult` | `sendable: bool`, `feedback: str` |
 
----
-
-## Features
-
-- **Fully automated inbox processing** — runs on a schedule or manually triggered from the dashboard
-- **Context-aware replies** — answers grounded in your own uploaded documents, not generic LLM knowledge
-- **Self-proofreading loop** — replies are checked and revised before sending
-- **Smart auto-send** — safe replies sent automatically; risky ones queued for human review
-- **Human review queue** — review, edit, approve or reject any draft reply
-- **Threaded inbox view** — all emails grouped by thread with status, priority, sentiment
-- **Analytics dashboard** — automation rate, time saved, category breakdown, sentiment charts
-- **Contact intelligence** — per-contact history with sentiment trends
-- **Policy Chat** — multi-turn RAG chat over your documents (ask anything about your business)
-- **Knowledge base management** — upload, view, and delete business documents via the dashboard
-- **Light and dark mode** — glassmorphism UI with animated sky background
-- **Multi-user auth** — Google OAuth login; each user has their own Gmail + isolated data
+**Guaranteed JSON responses** → **deterministic routing** → **no parsing errors**.
 
 ---
 
-## Dashboard Pages
+## Dashboard Features
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/dashboard.png"/><p align="center"><em>Command Center — stats + pipeline trigger</em></p></td>
-<td width="50%"><img src="docs/screenshots/dashboard-dark.png"/><p align="center"><em>Dark mode</em></p></td>
+<td width="50%"><img src="docs/screenshots/dashboard.png" alt="Dashboard"/><p align="center"><em><strong>Command Center</strong><br/>Pipeline stats & trigger</em></p></td>
+<td width="50%"><img src="docs/screenshots/dashboard-dark.png" alt="Dark Mode"/><p align="center"><em><strong>Dark Mode</strong><br/>Glassmorphism design</em></p></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/inbox.png"/><p align="center"><em>AI Inbox — threaded view with filters</em></p></td>
-<td><img src="docs/screenshots/review-queue.png"/><p align="center"><em>Human Review Queue — edit and approve drafts</em></p></td>
+<td><img src="docs/screenshots/inbox.png" alt="AI Inbox"/><p align="center"><em><strong>AI Inbox</strong><br/>Threaded view, filters</em></p></td>
+<td><img src="docs/screenshots/analytics.png" alt="Analytics"/><p align="center"><em><strong>Analytics</strong><br/>Sentiment & trends</em></p></td>
 </tr>
 <tr>
-<td><img src="docs/screenshots/analytics.png"/><p align="center"><em>Analytics — sentiment analysis + daily activity</em></p></td>
-<td><img src="docs/screenshots/policy-chat.png"/><p align="center"><em>Policy Chat — multi-turn RAG assistant</em></p></td>
+<td><img src="docs/screenshots/review-queue.png" alt="Review Queue"/><p align="center"><em><strong>Human Review Queue</strong><br/>Edit & approve drafts</em></p></td>
+<td><img src="docs/screenshots/policy-chat.png" alt="Policy Chat"/><p align="center"><em><strong>Policy Chat</strong><br/>RAG assistant</em></p></td>
 </tr>
 </table>
 
@@ -198,16 +245,16 @@ All LLM calls use **structured output** (`with_structured_output`) with Pydantic
 
 ## Tech Stack
 
-| Layer | Technology |
+| Component | Technology |
 |---|---|
-| **AI Orchestration** | LangGraph 1.1 — directed state graph |
-| **LLM** | Google Gemini 2.0 Flash (primary), OpenRouter + Groq (fallback) |
-| **Vector Store** | ChromaDB (persistent local) |
-| **Embeddings** | HuggingFace `all-MiniLM-L6-v2` (384-dim, local) |
-| **Email** | Gmail API via `google-auth-oauthlib` |
+| **Orchestration** | LangGraph 1.1 — directed state graph |
+| **LLM** | Google Gemini 2.0 Flash (+ OpenRouter/Groq fallback) |
+| **Vector Store** | ChromaDB (local, persistent) |
+| **Embeddings** | HuggingFace `all-MiniLM-L6-v2` (384-dim) |
+| **Email** | Gmail API (`google-auth-oauthlib`) |
 | **Backend** | FastAPI + Uvicorn |
 | **Frontend** | React 19 + Vite + TypeScript |
-| **Styling** | Tailwind CSS 4 + CSS custom properties |
+| **Styling** | Tailwind CSS 4 + CSS variables |
 | **Charts** | Recharts |
 | **Animation** | Motion (Framer Motion) |
 | **Auth** | Google OAuth 2.0 + PyJWT |
@@ -218,50 +265,33 @@ All LLM calls use **structured output** (`with_structured_output`) with Pydantic
 
 ```
 invoice_automation/
-├── app_server.py          # FastAPI backend — all /api/* endpoints
-├── main.py                # Pipeline CLI entry point
-├── populate_db_local.py   # Build ChromaDB vector store from data/
-├── render.yaml            # Render.com deployment config
-├── ARCHITECTURE.md        # Developer reference & gotchas
+├── app_server.py          # FastAPI backend
+├── main.py                # Pipeline CLI entry
+├── populate_db_local.py   # Build vector store
 │
 ├── src/
-│   ├── graph.py           # LangGraph StateGraph — the pipeline wiring
-│   ├── nodes.py           # One method per graph node
-│   ├── agents.py          # LangChain chains: prompt | LLM | structured output
-│   ├── prompts.py         # All prompt templates
-│   ├── state.py           # GraphState TypedDict + Email Pydantic model
-│   ├── structure_outputs.py  # Pydantic output schemas (category, sentiment, etc.)
-│   ├── history_store.py   # Email history read/write + analytics calculations
-│   ├── auth_service.py    # JWT utilities + per-user directory helpers
-│   ├── chat_service.py    # Multi-turn RAG chat session management
-│   ├── llm.py             # LLM provider with fallback chain
-│   └── tools/
-│       └── GmailTools.py  # Gmail API: fetch threads, send reply, create draft
+│   ├── graph.py           # LangGraph state machine
+│   ├── nodes.py           # Pipeline nodes
+│   ├── agents.py          # LangChain chains (LLM integration)
+│   ├── prompts.py         # Prompt templates
+│   ├── state.py           # GraphState + Email model
+│   ├── structure_outputs.py  # Pydantic schemas
+│   ├── history_store.py   # History persistence
+│   ├── auth_service.py    # Multi-user auth
+│   ├── llm.py             # LLM provider + fallback
+│   └── tools/GmailTools.py # Gmail API integration
 │
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx                    # Routes + auth guards
-│   │   ├── context/
-│   │   │   ├── AuthContext.tsx        # JWT auth state management
-│   │   │   └── ThemeContext.tsx       # Light / dark theme toggle
-│   │   ├── components/
-│   │   │   └── Layout.tsx             # Sidebar + animated background
-│   │   └── pages/
-│   │       ├── Landing.tsx            # Marketing landing page
-│   │       ├── Login.tsx              # Google Sign-In
-│   │       ├── Setup.tsx              # First-time API key entry
-│   │       ├── Dashboard.tsx          # Command center + pipeline controls
-│   │       ├── Threads.tsx            # Threaded AI inbox
-│   │       ├── ReviewQueue.tsx        # Human approval queue
-│   │       ├── Analytics.tsx          # Charts + sentiment breakdown
-│   │       ├── History.tsx            # Contact intelligence hub
-│   │       ├── Documents.tsx          # Knowledge base management
-│   │       └── Chat.tsx               # Policy assistant (RAG chat)
-│   └── vite.config.ts
+├── frontend/              # React dashboard
+│   ├── src/pages/        # 10 dashboard pages
+│   ├── src/context/      # Auth + Theme context
+│   └── src/components/   # Layout + shared UI
 │
-├── data/                  # Business documents for RAG (gitignored)
+├── data/                  # Your business documents (gitignored)
 ├── db_local/              # ChromaDB vector store (gitignored)
-└── docs/screenshots/      # UI screenshots
+├── docs/
+│   ├── ARCHITECTURE.md    # Developer reference
+│   └── screenshots/       # UI screenshots
+└── README.md              # This file
 ```
 
 ---
@@ -269,36 +299,32 @@ invoice_automation/
 ## Quick Start
 
 ```bash
-# 1. Clone and set up Python environment
+# 1. Clone and setup
 git clone https://github.com/sarcasticpanda/Invoice_automation.git
 cd Invoice_automation
-python -m venv venv && venv\Scripts\activate  # Windows
+python -m venv venv && venv\Scripts\activate
 pip install -r requirements.txt
 
-# 2. Configure credentials
+# 2. Configure
 cp .env.example .env
-# Edit .env: add MY_EMAIL, GOOGLE_API_KEY (Gemini), GROQ_API_KEY
+# Edit .env: MY_EMAIL, GOOGLE_API_KEY (Gemini), GROQ_API_KEY
 
-# 3. Gmail authorisation (opens browser once)
+# 3. Gmail OAuth (opens browser once)
 python main.py
 
-# 4. Build the vector store from your documents
-# Place PDFs/TXTs in data/, then:
+# 4. Build vector store
 python populate_db_local.py
 
-# 5. Start the backend API
-python app_server.py
-
-# 6. Start the frontend
-cd frontend && npm install && npm run dev
-# Open http://localhost:3000
+# 5. Run
+python app_server.py       # Backend (port 5000)
+cd frontend && npm run dev  # Frontend (port 3000)
 ```
 
 **Run modes:**
 ```bash
-python main.py              # Smart — auto-send safe, queue sensitive
-python main.py --auto-send  # Send everything automatically
-python main.py --no-auto-send  # Queue everything for review
+python main.py                # Smart: auto-send safe, queue risky
+python main.py --auto-send    # Send all
+python main.py --no-auto-send # Queue all for review
 ```
 
 ---
