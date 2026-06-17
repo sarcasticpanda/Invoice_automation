@@ -10,12 +10,15 @@ import ReviewQueue from './pages/ReviewQueue'
 import Threads from './pages/Threads'
 import ThreadDetail from './pages/ThreadDetail'
 import Analytics from './pages/Analytics'
+import Landing from './pages/Landing'
 import './index.css'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Public landing page — no dashboard sidebar */}
+        <Route path="/welcome" element={<Landing />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/threads" element={<Threads />} />

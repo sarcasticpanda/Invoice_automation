@@ -37,9 +37,11 @@ def _primary(temperature: float):
             temperature=temperature, max_retries=3, rate_limiter=_rate_limiter(0.15),
         )
     from langchain_groq import ChatGroq
+    # ~8 req/min and 6 retries: paces RAG-heavy runs under the free per-minute
+    # token limit so a reply completes instead of erroring out mid-way.
     return ChatGroq(
         model=os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
-        temperature=temperature, max_retries=3, rate_limiter=_rate_limiter(0.2),
+        temperature=temperature, max_retries=6, rate_limiter=_rate_limiter(0.13),
     )
 
 
