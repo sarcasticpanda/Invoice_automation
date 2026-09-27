@@ -58,7 +58,7 @@ export default function ContactDetail() {
             return (
               <motion.div key={i} initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.08 }}
                 className="relative pl-8 before:absolute before:inset-y-0 before:left-[15px] before:w-px last:before:bottom-auto"
-                style={{'--tw-before-border':'rgba(0,0,0,0.08)' as any}}>
+                style={{'--tw-before-border':'rgba(0,0,0,0.08)'} as any}>
                 <div className="absolute inset-y-0 left-[15px] w-px" style={{background:'rgba(0,0,0,0.08)'}} />
                 <div className="absolute left-0 top-6 w-[30px] h-[30px] rounded-full flex items-center justify-center"
                   style={{ background:'rgba(255,255,255,0.9)', border:'1px solid rgba(0,0,0,0.12)' }}>
