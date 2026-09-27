@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'motion/react'
-import { Mail, FileText, Send, SkipForward, Play, Loader2, Inbox, XCircle } from 'lucide-react'
+import { Mail, FileText, Send, Play, Loader2, Inbox } from 'lucide-react'
 
 interface Stats {
   total_chunks: number; total_docs: number; db_status: string
