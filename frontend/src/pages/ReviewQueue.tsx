@@ -148,8 +148,8 @@ export default function ReviewQueue() {
             style={{ background:'rgba(15,23,42,0.45)', backdropFilter:'blur(8px)' }}>
             <motion.div initial={{ scale:0.96,opacity:0 }} animate={{ scale:1,opacity:1 }} exit={{ scale:0.96,opacity:0 }}
               onClick={e=>e.stopPropagation()}
-              className="w-full max-w-2xl max-h-[82vh] flex flex-col overflow-hidden rounded-2xl"
-              className="light-modal"
+              className="w-full max-w-2xl max-h-[82vh] flex flex-col overflow-hidden rounded-2xl light-modal"
+              
               style={{ background:'var(--modal-bg)', border:'1px solid var(--card-border)', backdropFilter:'blur(24px)', boxShadow:'0 24px 64px rgba(0,0,0,0.22)' }}>
               <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom:'1px solid rgba(0,0,0,0.07)' }}>
                 <div className="min-w-0">
